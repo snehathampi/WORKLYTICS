@@ -1,0 +1,258 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Segoe UI", sans-serif;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Segoe UI", sans-serif;
+
+    background-image:
+        linear-gradient(rgba(244, 248, 255, 0.9), rgba(244, 248, 255, 0.9)),
+        url("../images/bg.jpeg");
+
+    background-size: cover;
+    background-position: center;
+}
+
+
+
+
+
+
+/* NAVBAR */
+.navbar {
+    height: 70px;
+    padding: 0 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: transparent;
+}
+
+.logo {
+    font-size: 22px;
+    font-weight: 600;
+    color: #5b7cff;
+}
+
+.register-btn {
+    padding: 10px 20px;
+    background-color: #5b7cff;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+/* HERO SECTION */
+.hero {
+    text-align: center;
+    margin-top: 120px;
+    padding-bottom: 300px;
+}
+.hero h1 {
+    color: #1f2a44;
+}
+
+.hero h3,
+.hero p {
+    color: #4b5b78;
+}
+
+
+
+
+.hero h1 {
+    font-size: 64px;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.hero h3 {
+    font-size: 22px;
+    font-weight: 500;
+    color: #5a6c8a;
+    margin-bottom: 20px;
+}
+
+.hero p {
+    font-size: 16px;
+    color: #6b7a99;
+    max-width: 600px;
+    margin: 0 auto 40px;
+}
+
+/* BUTTONS */
+.buttons {
+    display: flex;
+    justify-content: center;
+}
+
+.login-btn {
+    padding: 14px 40px;
+    background-color: #5b7cff;
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+/* FOOTER */
+footer {
+    position: absolute;
+    bottom: 20px;
+    width: 100%;
+    text-align: center;
+    font-size: 14px;
+    color: #9aa7c0;
+}
+/* AUTH PAGES (LOGIN & REGISTER) */
+
+.auth-container {
+    width: 360px;
+    margin: 120px auto;
+    padding: 30px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.auth-container h2 {
+    margin-bottom: 20px;
+    color: #1f2a44;
+}
+
+.auth-container input,
+.auth-container select {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+}
+
+
+
+.primary-btn {
+    display: inline-block;
+    padding: 14px 42px;
+    background-color: #5b7cff;
+    color: white;
+    text-decoration: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 500;
+    transition: background 0.3s ease;
+}
+
+.primary-btn:hover {
+    background-color: #4a6cf7;
+}
+
+
+.auth-text {
+    margin-top: 15px;
+    font-size: 14px;
+    color: #555;
+}
+
+.auth-text a {
+    color: #5b7cff;
+    text-decoration: none;
+}
+/* MANAGER DASHBOARD */
+
+.topbar {
+    height: 60px;
+    background-color: #5b7cff;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 30px;
+}
+
+.dashboard-container {
+    display: flex;
+}
+
+.sidebar {
+    width: 220px;
+    background-color: #f0f4ff;
+    min-height: calc(100vh - 60px);
+}
+
+.sidebar ul {
+    list-style: none;
+    padding: 20px;
+}
+
+.sidebar li {
+    padding: 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    border-radius: 6px;
+}
+
+.sidebar li.active,
+.sidebar li:hover {
+    background-color: #dbe5ff;
+}
+
+.main-content {
+    flex: 1;
+    padding: 30px;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.card h3 {
+    font-size: 14px;
+    color: #555;
+}
+
+.card p {
+    font-size: 28px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.table-section {
+    margin-top: 40px;
+}
+
+.table-section table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.table-section th,
+.table-section td {
+    padding: 14px;
+    border-bottom: 1px solid #eee;
+    text-align: left;
+}
+
+.table-section th {
+    background-color: #f4f8ff;
+}

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login | Worklytics</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- NAVBAR -->
+    <header class="navbar">
+        <div class="logo">Worklytics</div>
+    </header>
+
+    <!-- LOGIN FORM -->
+    <div class="auth-container">
+        <h2>Login</h2>
+        
+        {% if messages %}
+            {% for message in messages %}
+                <p style="color: {% if message.tags == 'success' %}green{% elif message.tags == 'warning' %}orange{% else %}red{% endif %};">
+                    {{ message }}
+                </p>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" action="{% url 'login' %}">
+            {% csrf_token %}
+            
+            <input 
+                type="email" 
+                name="email" 
+                id="email"
+                placeholder="Company Email" 
+                value="{{ form.email.value|default:'' }}"
+                required
+            >
+
+            <input 
+                type="password" 
+                name="password" 
+                id="password"
+                placeholder="Password" 
+                required
+            >
+
+            {% if form.errors %}
+                <p style="color:red; font-size:14px;">Invalid email or password.</p>
+            {% endif %}
+
+            <button type="submit" class="primary-btn">Login</button>
+        </form>
+
+        <p class="auth-text">
+            Don't have an account?
+            <a href="{% url 'register' %}">Register</a>
+        </p>
+    </div>
+</body>
+</html>

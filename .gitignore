@@ -1,0 +1,91 @@
+# ─── Python ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.Python
+
+# ─── Virtual Environment ────────────────────────────────
+venv/
+env/
+ENV/
+.venv/
+.env/
+Pipfile.lock
+
+# ─── Django specific ────────────────────────────────────
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+
+# ─── Environment & secrets ──────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+*.pem
+*.key
+secrets/
+
+# ─── Migrations (team decision: track these) ────────────
+# We are NOT ignoring migrations so the whole team
+# stays in sync on database schema changes.
+# Only ignore if you face constant migration conflicts.
+# accounts/migrations/*
+# core/migrations/*
+# worklytics/migrations/*
+# !*/migrations/__init__.py
+
+# ─── Static files (collected) ───────────────────────────
+# Ignore only the 'collectstatic' output folder, NOT your
+# source static/ folder (css, js, images should be tracked)
+staticfiles/
+collected_static/
+
+# ─── VS Code ────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# ─── IDE / Editor ───────────────────────────────────────
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# ─── OS files ───────────────────────────────────────────
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+
+# ─── Testing & coverage ─────────────────────────────────
+coverage/
+.coverage
+*.lcov
+htmlcov/
+.pytest_cache/
+.tox/
+
+# ─── Build / dist ───────────────────────────────────────
+dist/
+build/
+*.egg-info/
+*.egg
+wheels/
+
+# ─── Uploads / user content ─────────────────────────────
+media/
+uploads/
+
+# ─── Misc ───────────────────────────────────────────────
+*.bak
+*.tmp
+*.temp
+.history/

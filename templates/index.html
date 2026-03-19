@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Worklytics</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+    <!-- NAVBAR -->
+    <header class="navbar">
+        <div class="logo">Worklytics</div>
+        <a href="{% url 'register' %}" class="register-btn">Register</a>
+    </header>
+
+    <!-- HERO SECTION -->
+    <section class="hero">
+        <h1>Worklytics</h1>
+        <h3>Smarter project planning, made simple.</h3>
+
+        <p>
+            A clean and intelligent way to organize work, manage teams,
+            track progress, and move forward with clarity.
+        </p>
+
+        {% if messages %}
+            {% for message in messages %}
+                <p style="color: green;">{{ message }}</p>
+            {% endfor %}
+        {% endif %}
+
+        <div class="buttons">
+            <a href="{% url 'login' %}" class="primary-btn">Login</a>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        © 2026 Worklytics. All rights reserved.
+    </footer>
+
+</body>
+</html>

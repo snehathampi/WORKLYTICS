@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Worklytics – Manager Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Django Static Files -->
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/manager.css' %}">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ══ TOP BAR ══ -->
+<div class="topbar">
+  <button class="menu-toggle" onclick="toggleSidebar()">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+  </button>
+  <a class="topbar-brand" href="#">
+    <div class="logo-box">W</div>
+    Worklytics
+  </a>
+  <div class="topbar-search">
+    <svg width="14" height="14" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" placeholder="Search...">
+  </div>
+  <div class="topbar-actions">
+    <button class="topbar-icon-btn">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <button class="topbar-icon-btn">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+    </button>
+    <button class="topbar-icon-btn">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    </button>
+    <div style="position:relative;">
+      <div class="avatar" onclick="toggleProfile()">{{ manager_initials|default:"US" }}</div>
+      <div class="profile-dropdown" id="profileDropdown">
+        <div class="profile-dropdown-header">
+          <div class="profile-avatar-lg">{{ manager_initials|default:"US" }}</div>
+          <div style="margin-left:10px;">
+            <div style="color:#fff;font-size:13px;font-weight:600;">{{ manager_name|default:"Manager" }}</div>
+            <div style="color:#8b93b0;font-size:11px;">{{ manager_email|default:"manager@worklytics.com" }}</div>
+          </div>
+        </div>
+        <div class="profile-section-label">Profile Details</div>
+        <div class="profile-item">
+          <div class="profile-item-icon">
+            <svg width="13" height="13" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div><div class="profile-item-text">My Profile</div><div class="profile-item-sub">Manage account</div></div>
+        </div>
+        <div class="profile-item">
+          <div class="profile-item-icon">
+            <svg width="13" height="13" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+          </div>
+          <div><div class="profile-item-text">Settings</div><div class="profile-item-sub">App preferences</div></div>
+        </div>
+        <div class="profile-divider"></div>
+        <div class="profile-item logout" onclick="window.location.href='{% url 'logout' %}'">
+          <div class="profile-item-icon">
+            <svg width="13" height="13" fill="none" stroke="#f87171" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </div>
+          <div class="profile-item-text">Log out</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ APP BODY ══ -->
+<div class="app-body">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-link active" id="nav-home" onclick="showPage('home')">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Home
+    </button>
+    <button class="sidebar-link" id="nav-projects" onclick="showPage('projects')">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Projects
+    </button>
+    <button class="sidebar-link" id="nav-workload" onclick="showPage('workload')">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Workload
+    </button>
+    <button class="sidebar-link" id="nav-simulation" onclick="showPage('simulation')">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 3a3 3 0 0 0-3 3l-4 10a3 3 0 1 0 2.83 1.17L18 7a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/><circle cx="6" cy="18" r="3"/></svg>
+      Simulation
+    </button>
+    <button class="sidebar-link" id="nav-performance" onclick="showPage('performance')">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Performance
+    </button>
+
+    <div class="sidebar-section-label">Projects</div>
+    {% for project in manager_projects %}
+    <button class="sidebar-link">
+      <span class="sidebar-project-dot" style="background:{{ project.color|default:'#6366f1' }};"></span>
+      {{ project.name }}
+    </button>
+    {% empty %}
+    <p style="color: #6b7280; font-size: 12px; padding: 10px;">No projects yet</p>
+    {% endfor %}
+
+    <div class="sidebar-bottom">
+      <div class="invite-btn">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+        Invite teammates
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- ══════════ HOME PAGE ══════════ -->
+    <div class="page active" id="page-home">
+      <div class="page-header-row">
+        <div>
+          <div class="page-date" id="todayDate">{{ current_date|default:"SUNDAY, MARCH 1" }}</div>
+          <div class="page-greeting">Good morning, {{ manager_name|default:"Manager" }}</div>
+        </div>
+        <div class="header-right">
+          <div class="week-selector">
+            My week
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="tasks-completed-badge">
+            <svg width="14" height="14" fill="none" stroke="#22c55e" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+            {{ total_completed_tasks|default:"4" }} tasks completed
+          </div>
+        </div>
+      </div>
+
+      <div class="home-grid">
+        <!-- Priority Overview -->
+        <div class="card home-card-wide">
+          <div class="card-header">
+            <div class="card-title">
+              <svg width="15" height="15" fill="none" stroke="#f59e0b" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Priority Overview
+            </div>
+            <button class="card-menu">···</button>
+          </div>
+          <div class="priority-stats">
+            <div class="pstat"><span class="pstat-val">{{ active_projects|default:"3" }}</span><span class="pstat-label">Active Projects</span></div>
+            <div class="pstat"><span class="pstat-val">{{ completed_tasks|default:"4" }}</span><span class="pstat-label">Completed Tasks</span></div>
+            <div class="pstat"><span class="pstat-val">{{ in_progress_tasks|default:"5" }}</span><span class="pstat-label">In Progress</span></div>
+            <div class="pstat"><span class="pstat-val">{{ team_members|default:"5" }}</span><span class="pstat-label">Team Members</span></div>
+          </div>
+          <div style="margin-top:16px;">
+            <div class="completion-row">
+              <span class="completion-label">Total Completion Rate</span>
+              <span class="completion-pct">{{ completion_rate|default:"29" }}%</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="width:{{ completion_rate|default:'29' }}%;background:#22c55e;"></div></div>
+          </div>
+        </div>
+
+        <!-- Team Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Team
+            </div>
+            <button class="card-menu" style="background:none;border:none;cursor:pointer;color:#6b7280;font-size:18px;" onclick="showPage('workload')">+</button>
+          </div>
+          <div class="team-avatars">
+            {% for member in team_members_list %}
+            <div class="team-avatar" style="background:{{ member.color|default:'#6366f1' }};" title="{{ member.name }}">{{ member.initials }}</div>
+            {% empty %}
+            <div class="team-avatar" style="background:#6366f1;" title="Michael Chen">MC</div>
+            <div class="team-avatar" style="background:#ef4444;" title="Emily Rodriguez">ER</div>
+            <div class="team-avatar" style="background:#06b6d4;" title="James Wilson">JW</div>
+            <div class="team-avatar" style="background:#8b5cf6;" title="Lisa Anderson">LA</div>
+            <div class="team-avatar" style="background:#f59e0b;" title="David Kim">DK</div>
+            {% endfor %}
+            <div class="team-avatar" style="background:#374151;font-size:14px;" onclick="showPage('workload')">+</div>
+          </div>
+          <p style="font-size:12px;color:#6b7280;text-align:center;margin:12px 0 8px;">Invite your teammates to collaborate.</p>
+          <button class="btn-invite" onclick="showPage('workload')">Invite teammates</button>
+        </div>
+      </div>
+
+      <!-- Recent Projects + Weekly Activity -->
+      <div class="home-grid2">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              Recent Projects
+            </div>
+            <a class="view-all-link" onclick="showPage('projects')">See all</a>
+          </div>
+          <div class="project-list">
+            {% for project in recent_projects %}
+            <div class="project-row">
+              <div class="project-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/></svg></div>
+              <div class="project-info">
+                <div class="project-name">{{ project.name }}</div>
+                <div class="project-meta"><span class="badge-inprogress">{{ project.status }}</span> • {{ project.task_count }} tasks</div>
+              </div>
+              <div class="project-progress-block">
+                <div style="font-size:11px;color:#6b7280;text-align:right;margin-bottom:4px;">Progress <strong>{{ project.progress }}%</strong></div>
+                <div class="mini-progress"><div style="width:{{ project.progress }}%;background:#6366f1;height:100%;border-radius:4px;"></div></div>
+              </div>
+            </div>
+            {% empty %}
+            <div class="project-row">
+              <div class="project-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/></svg></div>
+              <div class="project-info">
+                <div class="project-name">Customer Portal Redesign</div>
+                <div class="project-meta"><span class="badge-inprogress">In Progress</span> • 5 tasks</div>
+              </div>
+              <div class="project-progress-block">
+                <div style="font-size:11px;color:#6b7280;text-align:right;margin-bottom:4px;">Progress <strong>20%</strong></div>
+                <div class="mini-progress"><div style="width:20%;background:#6366f1;height:100%;border-radius:4px;"></div></div>
+              </div>
+            </div>
+            <div class="project-row">
+              <div class="project-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/></svg></div>
+              <div class="project-info">
+                <div class="project-name">Mobile App Development</div>
+                <div class="project-meta"><span class="badge-inprogress">In Progress</span> • 4 tasks</div>
+              </div>
+              <div class="project-progress-block">
+                <div style="font-size:11px;color:#6b7280;text-align:right;margin-bottom:4px;">Progress <strong>50%</strong></div>
+                <div class="mini-progress"><div style="width:50%;background:#6366f1;height:100%;border-radius:4px;"></div></div>
+              </div>
+            </div>
+            <div class="project-row">
+              <div class="project-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/></svg></div>
+              <div class="project-info">
+                <div class="project-name">API Integration Platform</div>
+                <div class="project-meta"><span class="badge-inprogress">In Progress</span> • 3 tasks</div>
+              </div>
+              <div class="project-progress-block">
+                <div style="font-size:11px;color:#6b7280;text-align:right;margin-bottom:4px;">Progress <strong>33%</strong></div>
+                <div class="mini-progress"><div style="width:33%;background:#6366f1;height:100%;border-radius:4px;"></div></div>
+              </div>
+            </div>
+            {% endfor %}
+            <div class="create-project-row" onclick="openNewProjectModal()">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              Create new project
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title" style="margin-bottom:16px;">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/></svg>
+            Weekly Activity
+          </div>
+          <canvas id="weeklyActivityChart" height="160" data-weekly='{{ weekly_activity_json|safe }}'></canvas>
+        </div>
+      </div>
+
+      <!-- Task Status + Workload Distribution -->
+      <div class="home-grid equal">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:16px;">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            Task Status Distribution
+          </div>
+          <div style="display:flex;align-items:center;gap:24px;">
+            <canvas id="taskStatusChart" width="160" height="160" data-completed="{{ completed_tasks_count|default:0 }}" data-progress="{{ in_progress_count|default:0 }}" data-review="{{ review_count|default:0 }}" data-todo="{{ todo_count|default:0 }}"></canvas>
+            <div class="chart-legend">
+              <div class="legend-item"><span class="legend-dot" style="background:#22c55e;"></span> Completed</div>
+              <div class="legend-item"><span class="legend-dot" style="background:#06b6d4;"></span> In Progress</div>
+              <!--<div class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span> Review</div>-->
+              <div class="legend-item"><span class="legend-dot" style="background:#d1d5db;"></span> To Do</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:16px;">
+            <svg width="15" height="15" fill="none" stroke="#f97316" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Workload Distribution
+          </div>
+          <canvas id="workloadDistChart" height="180" data-employees='{{ workload_dist_json|safe }}'></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ PROJECTS PAGE ══════════ -->
+    <div class="page" id="page-projects">
+      <div class="page-header-row">
+        <div>
+          <h1 class="page-title">Project Management</h1>
+          <p class="page-subtitle">Create and manage projects and tasks</p>
+        </div>
+        <button class="btn-primary" onclick="openNewProjectModal()">
+          <svg width="13" height="13" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          New Project
+        </button>
+      </div>
+      <div class="projects-grid" id="projectsGrid">
+        {% for project in all_projects %}
+        <div class="project-card" data-id="{{ project.id }}">
+          <div class="project-card-header">
+            <h3>{{ project.name }}</h3>
+            <button class="project-card-menu" onclick="openProjectMenu({{ project.id }})">···</button>
+          </div>
+          <p class="project-card-description">{{ project.description }}</p>
+          <div class="project-card-meta">
+            <span class="badge-priority priority-{{ project.priority|lower }}">{{ project.priority }}</span>
+            <span>Due: {{ project.end_date|date:"M d, Y" }}</span>
+          </div>
+          <div class="project-card-progress">
+            <div class="progress-label">
+              <span>Progress</span>
+              <span>{{ project.progress }}%</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="width:{{ project.progress }}%;"></div></div>
+          </div>
+          <div class="project-card-tasks">
+            <div class="task-summary">
+              <span><span class="task-count">{{ project.completed_tasks }}</span> Completed</span>
+              <span><span class="task-count">{{ project.pending_tasks }}</span> Pending</span>
+            </div>
+          </div>
+          
+          <!-- Action buttons for View/Edit/Delete/Add Task -->
+          <div class="project-card-actions" style="display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap;">
+            <button class="btn-outline-sm" onclick="viewProjectTasks({{ project.id }})" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <polyline points="9 11 12 14 22 4"/>
+              </svg>
+              View
+            </button>
+            <button class="btn-outline-sm" onclick="openAddTaskModal({{ project.id }})" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; background: #6366f1; color: white; border-color: #6366f1;">
+              <svg width="12" height="12" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+              Add Task
+            </button>
+            <button class="btn-outline-sm" onclick="editProject({{ project.id }})" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+              </svg>
+              Edit
+            </button>
+            <button class="btn-outline-sm" onclick="deleteProject({{ project.id }})" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; color:#ef4444;">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0h10"/>
+              </svg>
+              Delete
+            </button>
+          </div>
+        </div>
+        {% empty %}
+        <div class="empty-state">No projects yet. Click "New Project" to create one.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ══════════ WORKLOAD PAGE ══════════ -->
+    <div class="page" id="page-workload">
+      <div style="padding:28px 32px;">
+        <h1 class="page-title">Workload Analytics</h1>
+        <p class="page-subtitle">Analyze team workload distribution and capacity</p>
+
+        <div class="wl-stats-row">
+          <div class="wl-stat-card">
+            <div class="wl-stat-header"><span class="wl-stat-label">Total Team Members</span>
+              <svg width="16" height="16" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="wl-stat-val">{{ total_team_members|default:"5" }}</div>
+            <div class="wl-stat-sub">Active employees</div>
+          </div>
+          <div class="wl-stat-card">
+            <div class="wl-stat-header"><span class="wl-stat-label">Balanced Workload</span>
+              <svg width="16" height="16" fill="none" stroke="#22c55e" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+            </div>
+            <div class="wl-stat-val">{{ balanced_count|default:"4" }}</div>
+            <div class="wl-stat-sub">50–90% utilization</div>
+          </div>
+          <div class="wl-stat-card">
+            <div class="wl-stat-header"><span class="wl-stat-label">Overloaded</span>
+              <svg width="16" height="16" fill="none" stroke="#ef4444" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div class="wl-stat-val">{{ overloaded_count|default:"1" }}</div>
+            <div class="wl-stat-sub">&gt;90% utilization</div>
+          </div>
+          <div class="wl-stat-card">
+            <div class="wl-stat-header"><span class="wl-stat-label">Underutilized</span>
+              <svg width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            </div>
+            <div class="wl-stat-val">{{ underutilized_count|default:"0" }}</div>
+            <div class="wl-stat-sub">&lt;50% utilization</div>
+          </div>
+        </div>
+
+        <div class="wl-charts-row">
+          <div class="card">
+            <div class="card-title" style="margin-bottom:4px;">Workload Hours Distribution</div>
+            <p style="font-size:12px;color:#6b7280;margin-bottom:16px;">Total estimated hours assigned to each team member</p>
+            <canvas id="wlHoursChart" height="200" data-workload='{{ workload_hours_json|safe }}'></canvas>
+          </div>
+          <div class="card">
+            <div class="card-title" style="margin-bottom:4px;">Capacity Utilization</div>
+            <p style="font-size:12px;color:#6b7280;margin-bottom:16px;">Percentage of capacity being utilized</p>
+            <canvas id="wlCapacityChart" width="220" height="220" data-utilization='{{ capacity_utilization_json|safe }}'></canvas>
+          </div>
+        </div>
+
+        <!-- Task Completion Status -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-title" style="margin-bottom:4px;">Task Completion Status</div>
+          <p style="font-size:12px;color:#6b7280;margin-bottom:16px;">Completed vs pending tasks for each employee</p>
+          <canvas id="taskCompletionChart" height="160" data-completion='{{ task_completion_json|safe }}'></canvas>
+        </div>
+
+        <!-- Employee Workload Details -->
+        <div class="card">
+          <div class="card-title" style="margin-bottom:4px;">Employee Workload Details</div>
+          <p style="font-size:12px;color:#6b7280;margin-bottom:20px;">Comprehensive view of each team member's workload</p>
+          <div id="employeeDetails">
+            <table class="employee-table">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Tasks</th>
+                  <th>Hours</th>
+                  <th>Utilization</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for emp in employee_details %}
+                <tr>
+                  <td><div class="employee-name"><span class="employee-avatar" style="background:{{ emp.color }};">{{ emp.initials }}</span> {{ emp.name }}</div></td>
+                  <td>{{ emp.task_count }}</td>
+                  <td>{{ emp.hours }}h</td>
+                  <td>
+                    <div class="utilization-bar">
+                      <div class="utilization-fill" style="width:{{ emp.utilization }}%; background:{{ emp.color }};"></div>
+                      <span>{{ emp.utilization }}%</span>
+                    </div>
+                  </td>
+                  <td><span class="badge-{{ emp.status_class }}">{{ emp.status }}</span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ SIMULATION PAGE ══════════ -->
+    <div class="page" id="page-simulation">
+  <div style="padding:28px 32px;">
+    <div class="page-header-row">
+      <div>
+        <h1 class="page-title">Simulation Mode</h1>
+        <p class="page-subtitle">Test workload changes per project without affecting actual data</p>
+      </div>
+    </div>
+
+    <div class="sim-info-box" id="simInfoBox">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Each project has its own simulation. Click "Start Simulation" on a project to begin reassigning its tasks independently.
+    </div>
+
+    <div id="simProjectsContainer"></div>
+  </div>
+</div>
+
+    <!-- ══════════ PERFORMANCE PAGE ══════════ -->
+    <div class="page" id="page-performance">
+      <div style="padding:28px 32px;">
+        <h1 class="page-title">Team Performance</h1>
+        <p class="page-subtitle" style="margin-bottom:24px;">Track team productivity and performance metrics</p>
+        
+        <div class="perf-grid">
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px;">Overall Completion Rate</div>
+            <div style="display:flex;align-items:center;gap:24px;">
+              <canvas id="perfDonutChart" width="140" height="140" data-completed="{{ total_completed_tasks|default:4 }}" data-pending="{{ total_pending_tasks|default:10 }}"></canvas>
+              <div>
+                <div style="font-size:32px;font-weight:800;letter-spacing:-1px;">{{ overall_completion_rate|default:"29" }}%</div>
+                <div style="font-size:13px;color:#6b7280;">Tasks completed</div>
+                <div style="margin-top:16px;display:flex;flex-direction:column;gap:6px;">
+                  <div style="font-size:12px;"><span style="color:#22c55e;font-weight:700;">{{ total_completed_tasks|default:"4" }}</span> Completed</div>
+                  <div style="font-size:12px;"><span style="color:#06b6d4;font-weight:700;">{{ total_in_progress|default:"5" }}</span> In Progress</div>
+                  <div style="font-size:12px;"><span style="color:#d1d5db;font-weight:700;">{{ total_pending|default:"5" }}</span> Pending</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px;">Team Velocity (Weekly)</div>
+            <canvas id="perfVelocityChart" height="140" data-velocity='{{ velocity_json|safe }}'></canvas>
+          </div>
+        </div>
+        
+        <div class="card" style="margin-top:20px;">
+          <div class="card-title" style="margin-bottom:16px;">Individual Performance</div>
+          <table class="perf-table">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Tasks Total</th>
+                <th>Completed</th>
+                <th>In Progress</th>
+                <th>Utilization</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for emp in individual_performance %}
+              <tr>
+                <td><div class="member-cell"><div class="mini-av" style="background:{{ emp.color|default:'#6366f1' }};">{{ emp.initials }}</div>{{ emp.name }}</div></td>
+                <td>{{ emp.total_tasks }}</td>
+                <td><span style="color:#22c55e;font-weight:600;">{{ emp.completed }}</span></td>
+                <td>{{ emp.in_progress }}</td>
+                <td>{{ emp.utilization }}%</td>
+                <td><span class="badge-{{ emp.status_class }}">{{ emp.status }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.main -->
+</div><!-- /.app-body -->
+
+<!-- ══════════════════════════════════════════ -->
+<!-- NEW PROJECT MODAL                         -->
+<div class="modal-overlay" id="newProjectModal" onclick="closeModalOutside(event,'newProjectModal')">
+  <div class="modal">
+    <h3>Create New Project</h3>
+    <form id="newProjectForm">
+      {% csrf_token %}
+      <div class="form-group">
+        <label>Project Name</label>
+        <input type="text" name="name" id="newProjectName" placeholder="e.g. Website Redesign" required>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" name="description" id="newProjectDesc" placeholder="Short project description">
+      </div>
+      <div class="form-group">
+        <label>Priority</label>
+        <select name="priority" id="newProjectPriority">
+          <option value="high">High</option>
+          <option value="medium" selected>Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Due Date</label>
+        <input type="date" name="due_date" id="newProjectDue" required>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" type="button" onclick="closeModal('newProjectModal')">Cancel</button>
+        <button class="btn-primary" type="button" onclick="addProject()">Create Project</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- ADD TASK MODAL                            -->
+<div class="modal-overlay" id="addTaskModal" onclick="closeModalOutside(event,'addTaskModal')">
+  <div class="modal">
+    <h3 id="addTaskModalTitle">Add Task</h3>
+    <form id="addTaskForm">
+      {% csrf_token %}
+      <input type="hidden" name="project_id" id="taskProjectId">
+      <div class="form-group">
+        <label>Task Name</label>
+        <input type="text" name="title" id="newTaskName" placeholder="e.g. Design mockups" required>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea name="description" id="newTaskDescription" rows="3" placeholder="Task description..." style="width:100%; padding:8px; border-radius:6px; border:1px solid #e5e7eb;"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Assign To</label>
+        <select name="assigned_to" id="newTaskAssignee">
+          <option value="">-- Unassigned --</option>
+          {% for emp in all_employees %}
+          <option value="{{ emp.user_id }}">{{ emp.name }} ({{ emp.skills|default:"No skills" }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Dependencies (tasks that must be completed first)</label>
+        <select name="dependencies" id="newTaskDependencies" multiple size="3">
+          <!-- Options will be populated by JavaScript -->
+        </select>
+        <small style="color:#666; font-size:11px;">Hold Ctrl/Cmd to select multiple</small>
+      </div>
+      <div class="form-group">
+        <label>Priority</label>
+        <select name="priority" id="newTaskPriority">
+          <option value="high">High</option>
+          <option value="medium" selected>Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Estimated Hours</label>
+        <input type="number" name="estimated_hours" id="newTaskHours" placeholder="e.g. 40" min="1" required>
+      </div>
+      <div class="form-group">
+        <label>Due Date</label>
+        <input type="date" name="due_date" id="newTaskDue" required>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" type="button" onclick="closeModal('addTaskModal')">Cancel</button>
+        <button class="btn-primary" type="button" onclick="addTaskToProject()">Add Task</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="{% static 'js/manager.js' %}"></script>
+</body>
+</html>
