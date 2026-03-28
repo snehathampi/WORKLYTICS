@@ -7,4 +7,6 @@ urlpatterns = [
     path('', accounts_views.index, name='index'),
     path('', include('accounts.urls')),
     path('core/', include('core.urls')),
+    path('simulation/', include('simulation.urls')),
+    path('appraisal/', include('appraisal.urls')), 
 ]

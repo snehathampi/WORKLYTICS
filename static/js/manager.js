@@ -946,10 +946,12 @@ function initWorkloadCharts(data) {
 const projectSimStates = {};
 
 function updateSimulationPage() {
-    renderSimTable();
+    if (typeof SimModule !== 'undefined') {
+        SimModule.init();
+    }
 }
 
-function renderSimTable() {
+function renderSimTable_OLD_DISABLED() {
     const simCardsContainer = document.getElementById('simProjectsContainer');
     if (!simCardsContainer) return;
 
@@ -1095,28 +1097,20 @@ function renderSimTable() {
 }
 
 function toggleProjectSimulation(pid) {
-    projectSimStates[pid] = !projectSimStates[pid];
-    renderSimTable();
+    if (typeof SimModule !== 'undefined') {
+        SimModule.openProject(parseInt(pid));
+    }
 }
 
 // Keep old toggleSimulation as no-op so nothing breaks
 function toggleSimulation() {}
 
 function simChangeAssignee(index, newAssigneeId, taskId) {
-    if (allTasks[index]) {
-        const source = allEmployees.length > 0 ? allEmployees : employees;
-        const employee = source.find(e => {
-            const empId = e.user_id !== undefined ? e.user_id : e.id;
-            return empId == newAssigneeId;
-        });
-        allTasks[index].assigned_to = employee ? { id: parseInt(newAssigneeId), name: employee.name } : null;
-    }
+    // Handled by SimModule._onAssigneeChange
 }
 
 function simChangeStatus(index, newStatus, taskId) {
-    if (allTasks[index]) {
-        allTasks[index].status = newStatus;
-    }
+    // Handled by SimModule._onStatusChange
 }
 
 // ── PERFORMANCE PAGE ──────────────────────────────────
