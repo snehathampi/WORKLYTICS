@@ -280,17 +280,20 @@ function renderTasks() {
                                 <span class="status-badge status-${t.status}">${t.status}</span>
                             </div>
                             <div>
-                                <button class="btn-icon" onclick="updateTaskStatus(${t.id}, 'in_progress')" title="Start task" ${t.status === 'in_progress' || t.status === 'completed' ? 'disabled' : ''}>
+                                <button class="btn-icon" onclick="updateTaskStatus(${t.id}, 'in_progress')" 
+                                    title="${t.has_pending_dependencies ? 'Blocked — complete dependencies first' : 'Start task'}" 
+                                    ${t.status === 'in_progress' || t.status === 'completed' || t.has_pending_dependencies ? 'disabled' : ''}
+                                    style="${t.has_pending_dependencies ? 'opacity:0.35;cursor:not-allowed;' : ''}">                                    
                                     <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                         <polygon points="5 3 19 12 5 21 5 3"/>
                                     </svg>
                                 </button>
-                                <button class="btn-icon" onclick="updateTaskStatus(${t.id}, 'completed')" title="Complete" ${t.status === 'completed' ? 'disabled' : ''}>
+                                <button class="btn-icon" onclick="updateTaskStatus(${t.id}, 'completed')" title="${t.has_pending_dependencies ? 'Blocked — complete dependencies first' : 'Complete'}" ${t.status === 'completed' || t.has_pending_dependencies ? 'disabled' : ''} style="${t.has_pending_dependencies ? 'opacity:0.35;cursor:not-allowed;' : ''}">
                                     <svg width="14" height="14" fill="none" stroke="#22c55e" stroke-width="2" viewBox="0 0 24 24">
                                         <polyline points="20 6 9 17 4 12"/>
                                     </svg>
                                 </button>
-                                <button class="btn-icon" onclick="logHours(${t.id})" title="Log hours">
+                                <button class="btn-icon" onclick="logHours(${t.id})" title="${t.has_pending_dependencies ? 'Blocked — complete dependencies first' : 'Log hours'}" ${t.has_pending_dependencies ? 'disabled' : ''} style="${t.has_pending_dependencies ? 'opacity:0.35;cursor:not-allowed;' : ''}">
                                     <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                         <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
                                     </svg>
@@ -314,18 +317,32 @@ function toggleGroup(id) {
 
 function toggleDone(id) {
     const task = tasks.find(t => t.id === id);
-    if (task) {
-        const newStatus = task.done ? 'in_progress' : 'completed';
-        updateTaskStatus(id, newStatus);
+    if (!task) return;
+    if (!task.done) {
+        updateTaskStatus(id, 'completed');
+    } else {
+        if (task.has_pending_dependencies) {
+            showNotification('⛔ Cannot restart — complete dependencies first', 'error');
+            return;
+        }
+        updateTaskStatus(id, 'in_progress');
     }
 }
 
 // ── TASK ACTIONS ────────────────────────────────────
 function updateTaskStatus(taskId, newStatus) {
-    // Only allow these status changes from employee
     if (newStatus !== 'in_progress' && newStatus !== 'completed') {
         showNotification('Invalid status change', 'error');
         return;
+    }
+
+    // Block start if dependencies are not yet complete
+    if (newStatus === 'in_progress') {
+        const task = tasks.find(t => t.id === taskId);
+        if (task && task.has_pending_dependencies) {
+            showNotification('⛔ Cannot start — complete dependent tasks first', 'error');
+            return;
+        }
     }
     
     fetch(`/core/api/tasks/${taskId}/status/`, {
@@ -362,6 +379,11 @@ function updateTaskStatus(taskId, newStatus) {
 }
 
 function logHours(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (task && task.has_pending_dependencies) {
+        showNotification('⛔ Cannot log hours — complete dependencies first', 'error');
+        return;
+    }
     const hours = prompt('Enter actual hours spent:');
     if (hours === null) return;
     

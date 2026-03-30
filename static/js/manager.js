@@ -122,7 +122,16 @@ function showPage(page) {
     const navBtn = document.getElementById('nav-' + page);
     if (navBtn) navBtn.classList.add('active');
 
-    if (page === 'home') initHomeCharts();
+    if (page === 'home') {
+        initHomeCharts({
+            completed_tasks: (employeeWorkload || []).reduce((s, e) => s + (e.completed || 0), 0),
+            in_progress_tasks: (employeeWorkload || []).reduce((s, e) => s + (e.inProgress || 0), 0),
+            blocked_tasks: 0,
+            all_tasks: allTasks,
+            employee_workload: employeeWorkload,
+            weekly_activity: null,
+        });
+    }
     if (page === 'projects') renderProjects();
     if (page === 'workload') renderEmployeeDetails();
     if (page === 'simulation') renderSimTable();
@@ -147,20 +156,24 @@ document.addEventListener('click', e => {
 
 // ── UPDATE HOME PAGE ──────────────────────────────────
 function updateHomePage(data) {
-    const statValues = document.querySelectorAll('.pstat-val');
-    if (statValues.length >= 4) {
-        statValues[0].textContent = data.active_projects || 0;
-        statValues[1].textContent = data.completed_tasks || 0;
-        statValues[2].textContent = data.in_progress_tasks || 0;
-        statValues[3].textContent = data.total_team_members || 0;
-    }
-    
+    document.querySelectorAll('.pstat-val').forEach((el, i) => {
+        const vals = [
+            data.active_projects || 0,
+            data.completed_tasks || 0,
+            data.in_progress_tasks || 0,
+            data.total_team_members || 0,
+        ];
+        if (i < vals.length) el.textContent = vals[i];
+    });
+
     const completionPct = document.querySelector('.completion-pct');
-    const progressFill = document.querySelector('.progress-fill');
-    if (completionPct && progressFill) {
-        const rate = data.completion_rate || 0;
-        completionPct.textContent = rate + '%';
-        progressFill.style.width = rate + '%';
+    if (completionPct) completionPct.textContent = (data.completion_rate || 0) + '%';
+
+    // Target the progress fill inside the Priority Overview card specifically
+    const priorityCard = document.querySelector('.home-card-wide');
+    if (priorityCard) {
+        const fill = priorityCard.querySelector('.progress-fill');
+        if (fill) fill.style.width = (data.completion_rate || 0) + '%';
     }
     
     const recentContainer = document.querySelector('.project-list');
@@ -270,13 +283,20 @@ function initHomeCharts(data) {
     
     const weeklyCanvas = document.getElementById('weeklyActivityChart');
     if (weeklyCanvas) {
+        const weekly = (data && data.weekly_activity) ? data.weekly_activity : [
+            { label: 'Week 1', created: 0, completed: 0 },
+            { label: 'Week 2', created: 0, completed: 0 },
+            { label: 'Week 3', created: 0, completed: 0 },
+            { label: 'Week 4', created: 0, completed: 0 },
+        ];
+
         chartInstances['weeklyActivity'] = new Chart(weeklyCanvas, {
             type: 'bar',
             data: {
-                labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                labels: weekly.map(w => w.label),
                 datasets: [
-                    { label: 'Completed', data: [3, 5, 4, 6], backgroundColor: '#22c55e', borderRadius: 4 },
-                    { label: 'Planned', data: [5, 6, 6, 7], backgroundColor: '#d1d5db', borderRadius: 4 },
+                    { label: 'Created',   data: weekly.map(w => w.created),   backgroundColor: '#6366f1', borderRadius: 4 },
+                    { label: 'Completed', data: weekly.map(w => w.completed),  backgroundColor: '#22c55e', borderRadius: 4 },
                 ]
             },
             options: {
@@ -285,7 +305,14 @@ function initHomeCharts(data) {
                 },
                 scales: {
                     x: { grid: { display: false } },
-                    y: { beginAtZero: true, grid: { color: '#f3f4f6' } }
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#f3f4f6' },
+                        ticks: {
+                            stepSize: 1,
+                            callback: val => Number.isInteger(val) ? val : null
+                        }
+                    }
                 }
             }
         });
@@ -296,13 +323,13 @@ function initHomeCharts(data) {
         chartInstances['taskStatus'] = new Chart(statusCanvas, {
             type: 'doughnut',
             data: {
-                labels: ['Completed', 'In Progress', 'Review', 'To Do'],
+                labels: ['Completed', 'In Progress', 'Blocked', 'To Do'],
                 datasets: [{
                     data: [
-                        data.completed_tasks || 4,
-                        data.in_progress_tasks || 5,
-                        data.blocked_tasks || 1,
-                        4
+                        data ? (data.completed_tasks || 0) : 0,
+                        data ? (data.in_progress_tasks || 0) : 0,
+                        data ? (data.blocked_tasks || 0) : 0,
+                        data ? (data.todo_tasks || 0) : 0,
                     ],
                     backgroundColor: ['#22c55e', '#06b6d4', '#f59e0b', '#d1d5db'],
                     borderWidth: 0,
@@ -310,26 +337,40 @@ function initHomeCharts(data) {
                 }]
             },
             options: {
-                cutout: '68%',
-                plugins: { legend: { display: false } },
-                responsive: false
+                cutout: '65%',
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: { font: { size: 11 }, padding: 12, boxWidth: 12 }
+                    }
+                },
+                responsive: true,
+                maintainAspectRatio: false,
             }
         });
     }
 
     const workloadCanvas = document.getElementById('workloadDistChart');
     if (workloadCanvas) {
-        const members = (data.employee_workload || employees).map(e => e.name.split(' ')[0]);
-        const completedData = (data.employee_workload || employees).map(e => e.completed * 20 || 0);
-        const inProgressData = (data.employee_workload || employees).map(e => (e.tasks - e.completed) * 20 || 0);
-        
+        const wlSource = (data && data.employee_workload) ? data.employee_workload : employees;
+        const members = wlSource.map(e => e.name.split(' ')[0]);
+        const completedHours = wlSource.map(e => {
+            const ratio = (e.task_count || 0) > 0 ? (e.completed || 0) / e.task_count : 0;
+            return parseFloat(((e.hours || 0) * ratio).toFixed(1));
+        });
+        const pendingHours = wlSource.map(e => {
+            const ratio = (e.task_count || 0) > 0 ? (e.completed || 0) / e.task_count : 0;
+            return parseFloat(((e.hours || 0) * (1 - ratio)).toFixed(1));
+        });
+
         chartInstances['workloadDist'] = new Chart(workloadCanvas, {
             type: 'bar',
             data: {
                 labels: members,
                 datasets: [
-                    { label: 'Completed', data: completedData, backgroundColor: '#22c55e', borderRadius: 4 },
-                    { label: 'In Progress', data: inProgressData, backgroundColor: '#06b6d4', borderRadius: 4 },
+                    { label: 'Completed (h)', data: completedHours, backgroundColor: '#6366f1', borderRadius: 4 },
+                    { label: 'Pending (h)', data: pendingHours, backgroundColor: '#a78bfa', borderRadius: 4 },
                 ]
             },
             options: {
@@ -377,7 +418,9 @@ function renderProjects() {
                     <span>Progress</span>
                     <span>${p.progress || 0}%</span>
                 </div>
-                <div class="progress-bar"><div class="progress-fill" style="width:${p.progress || 0}%;"></div></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width:${p.progress || 0}%;background:#6366f1;height:100%;border-radius:4px;min-width:${p.progress > 0 ? '4px' : '0'};"></div>
+                </div>
             </div>
             
             <!-- Action buttons in a single row -->
@@ -523,7 +566,7 @@ function showTasksModal(projectName, tasksHtml) {
             </div>
             ${tasksHtml}
             <div class="modal-actions" style="margin-top: 20px; text-align: right;">
-                <button class="btn-primary" onclick="this.closest('.modal-overlay').remove()" style="padding: 8px 20px; background: #6366f1; color: white; border: none; border-radius: 6px; cursor: pointer;">Close</button>
+                <button class="btn-primary" onclick="this.closest('.modal-overlay').remove(); loadDashboardData();" style="padding: 8px 20px; background: #6366f1; color: white; border: none; border-radius: 6px; cursor: pointer;">Close</button>
             </div>
         </div>
     `;
@@ -781,10 +824,11 @@ function addTaskToProject(event) {
 // ── WORKLOAD PAGE ────────────────────────────────────
 function updateWorkloadPage(data) {
     const statValues = document.querySelectorAll('.wl-stat-val');
-    if (statValues.length >= 3) {
-        statValues[0].textContent = data.balanced_count || 0;
-        statValues[1].textContent = data.overloaded_count || 0;
-        statValues[2].textContent = data.underutilized_count || 0;
+    if (statValues.length >= 4) {
+        statValues[0].textContent = data.total_team_members || 0;
+        statValues[1].textContent = data.balanced_count || 0;
+        statValues[2].textContent = data.overloaded_count || 0;
+        statValues[3].textContent = data.underutilized_count || 0;
     }
     
     renderEmployeeDetails();
@@ -818,7 +862,7 @@ function renderEmployeeDetails() {
                 </div>
                 <div>
                     <div class="emp-stat-label">Utilization</div>
-                    <div class="emp-stat-val" style="color:${e.utilization >= 90 ? '#ef4444' : '#22c55e'};">${e.utilization}%</div>
+                    <div class="emp-stat-val" style="color:${e.status === 'overloaded' ? '#ef4444' : e.status === 'balanced' ? '#22c55e' : '#f59e0b'};">${e.utilization}%</div>
                 </div>
             </div>
             <div class="emp-capacity-row">
@@ -826,7 +870,7 @@ function renderEmployeeDetails() {
                 <span>${e.hours}h / 160h</span>
             </div>
             <div class="emp-progress">
-                <div class="emp-progress-fill" style="width:${Math.min(e.utilization, 100)}%;${e.utilization >= 90 ? 'background:#ef4444;' : ''}"></div>
+                <div class="emp-progress-fill" style="width:${Math.min(e.utilization, 100)}%;background:${e.status === 'overloaded' ? '#ef4444' : e.status === 'balanced' ? '#22c55e' : '#f59e0b'};"></div>
             </div>
             ${e.status === 'overloaded' ? `
                 <div class="emp-warning">
@@ -880,15 +924,15 @@ function initWorkloadCharts(data) {
 
     const capacityCanvas = document.getElementById('wlCapacityChart');
     if (capacityCanvas) {
-        const members = (data.employee_workload || employees).map(e => e.name.split(' ')[0]);
-        const colors = (data.employee_workload || employees).map(e => e.color || '#6366f1');
-        
+        const wlSrc = data.employee_workload || employees;
+        const colors = wlSrc.map(e => e.color || '#6366f1');
+
         chartInstances['wlCapacity'] = new Chart(capacityCanvas, {
             type: 'pie',
             data: {
-                labels: members.map((m, i) => `${m}: ${(data.employee_workload || employees)[i].utilization}%`),
+                labels: wlSrc.map(e => `${e.name.split(' ')[0]}: ${e.utilization}%`),
                 datasets: [{
-                    data: (data.employee_workload || employees).map(e => e.utilization),
+                    data: wlSrc.map(e => e.utilization),
                     backgroundColor: colors,
                     borderWidth: 2,
                     borderColor: '#fff',
@@ -897,9 +941,13 @@ function initWorkloadCharts(data) {
             },
             options: {
                 plugins: {
-                    legend: { position: 'right', labels: { font: { size: 11 }, padding: 12 } }
+                    legend: {
+                        position: 'bottom',
+                        labels: { font: { size: 11 }, padding: 14, boxWidth: 12 }
+                    }
                 },
-                responsive: false
+                responsive: true,
+                maintainAspectRatio: false,
             }
         });
     }

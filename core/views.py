@@ -212,6 +212,8 @@ def update_project(request, project_id):
             project.status = data.get('status')
         if data.get('end_date'):
             project.end_date = data.get('end_date')
+        if data.get('due_date'):
+            project.end_date = data.get('due_date')
         
         project.save()
         
@@ -314,6 +316,24 @@ def create_task(request):
         print(f"   assigned_to: {task.assigned_to}")
         print(f"   assigned_to_id: {task.assigned_to_id}")
         
+                # Save dependencies if provided
+        dependencies_raw = data.get('dependencies')
+        if dependencies_raw:
+            try:
+                import json as _json
+                dep_list = _json.loads(dependencies_raw) if isinstance(dependencies_raw, str) else dependencies_raw
+                for dep_id in dep_list:
+                    try:
+                        depends_on = Task.objects.get(id=dep_id, project=project)
+                        TaskDependency.objects.create(task=task, depends_on=depends_on)
+                        print(f"✅ Added dependency: {task.title} depends on {depends_on.title}")
+                    except Task.DoesNotExist:
+                        print(f"❌ Dependency task {dep_id} not found")
+                    except ValidationError as ve:
+                        print(f"❌ Dependency validation error: {ve}")
+            except Exception as de:
+                print(f"❌ Error saving dependencies: {de}")
+
         return JsonResponse({'success': True, 'task_id': task.id})
         
     except Exception as e:
@@ -532,7 +552,7 @@ def update_task(request, task_id):
 @csrf_exempt
 @api_login_required
 def delete_task(request, task_id):
-    """Delete a task"""
+    """Delete a task, cleaning up all dependencies"""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST method required'}, status=405)
     
@@ -547,7 +567,27 @@ def delete_task(request, task_id):
         if task.project.manager != manager:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
         
+        # Find tasks that were depending on THIS task (they become unblocked)
+        dependent_tasks = Task.objects.filter(
+            dependencies__depends_on=task
+        ).exclude(status='completed')
+        
+        for dep_task in dependent_tasks:
+            # Remove the dependency row for this specific blocker
+            TaskDependency.objects.filter(task=dep_task, depends_on=task).delete()
+            # If that was their only blocker, unblock them
+            if not dep_task.has_pending_dependencies and dep_task.status == 'blocked':
+                dep_task.status = 'todo'
+                dep_task.save()
+                print(f"✅ Unblocked task: {dep_task.title}")
+        
+        # Django CASCADE handles deleting TaskDependency rows where
+        # this task is the dependent (task.dependencies) automatically.
+        # The manual cleanup above handles rows where it's the blocker.
+        
+        task_title = task.title
         task.delete()
+        print(f"✅ Deleted task: {task_title}")
         return JsonResponse({'success': True})
     except Task.DoesNotExist:
         return JsonResponse({'error': 'Task not found'}, status=404)
@@ -770,7 +810,47 @@ def manager_dashboard_data(request):
         print(f"✅ Found {all_tasks.count()} tasks")
         
         # Calculate statistics
-        active_projects = projects.filter(status='active').count()
+        active_projects = projects.filter(
+            tasks__status__in=['todo', 'in_progress', 'blocked']
+        ).distinct().count()
+        # Weekly activity — past 4 weeks (Sunday to Saturday)
+        from datetime import date, timedelta, datetime as dt
+        from django.utils.timezone import make_aware, is_naive
+        today = date.today()
+        # Find most recent Sunday (Mon=0 ... Sun=6)
+        days_since_sunday = (today.weekday() + 1) % 7
+        this_sunday = today - timedelta(days=days_since_sunday)
+
+        weekly_activity = []
+        for i in range(3, -1, -1):  # 3 weeks ago → current week
+            week_start = this_sunday - timedelta(weeks=i)
+            week_end   = week_start + timedelta(days=6)  # Saturday
+
+            # Use timezone-aware datetimes for created_at (DateTimeField)
+            week_start_dt = make_aware(dt.combine(week_start, dt.min.time()))
+            week_end_dt   = make_aware(dt.combine(week_end,   dt.max.time()))
+
+            created = all_tasks.filter(
+                created_at__gte=week_start_dt,
+                created_at__lte=week_end_dt
+            ).count()
+
+            # completed_date is a plain DateField — no timezone needed
+            completed = all_tasks.filter(
+                completed_date__gte=week_start,
+                completed_date__lte=week_end
+            ).count()
+
+            if i == 0:
+                label = f'This Week ({week_start.strftime("%b %d")})'
+            else:
+                label = week_start.strftime('%b %d')
+
+            weekly_activity.append({
+                'label':     label,
+                'created':   created,
+                'completed': completed,
+            })
         total_tasks = all_tasks.count()
         completed_tasks = all_tasks.filter(status='completed').count()
         in_progress_tasks = all_tasks.filter(status='in_progress').count()
@@ -788,19 +868,19 @@ def manager_dashboard_data(request):
                 completed = Task.objects.filter(assigned_to=emp, status='completed').count()
                 in_progress = Task.objects.filter(assigned_to=emp, status='in_progress').count()
                 
-                # Determine status
-                if total_hours > 40:
+                # Determine status — capacity is 160h/month
+                CAPACITY = 160
+                utilization = round((total_hours / CAPACITY) * 100) if total_hours > 0 else 0
+
+                if total_hours > 120:
                     status = 'overloaded'
                     status_class = 'danger'
-                    utilization = min(round((total_hours / 40) * 100), 200)
-                elif total_hours > 20:
+                elif total_hours >= 60:
                     status = 'balanced'
                     status_class = 'success'
-                    utilization = round((total_hours / 40) * 100)
                 else:
                     status = 'underutilized'
                     status_class = 'warning'
-                    utilization = round((total_hours / 40) * 100) if total_hours > 0 else 0
                 
                 employee_workload.append({
                     'id': emp.user.id,
@@ -814,7 +894,7 @@ def manager_dashboard_data(request):
                     'hours': total_hours,
                     'status': status,
                     'status_class': status_class,
-                    'utilization': utilization,
+                    'utilization': min(utilization, 100),
                     'color': f'#{hash(emp.name) % 0xFFFFFF:06x}'
                 })
             except Exception as e:
@@ -841,9 +921,9 @@ def manager_dashboard_data(request):
         
         print(f"✅ Processed {len(recent_projects)} recent projects")
         
-        # All projects for projects page
+        # All projects for projects page — re-fetch fresh to get latest progress
         all_projects_list = []
-        for p in projects:
+        for p in Project.objects.filter(manager=manager).prefetch_related('tasks'):
             try:
                 # Test date formatting separately
                 end_date_str = ''
@@ -924,10 +1004,12 @@ def manager_dashboard_data(request):
             'manager_email': manager.email,
             
             # Home page data
+            'weekly_activity': weekly_activity,
             'active_projects': active_projects,
             'completed_tasks': completed_tasks,
             'in_progress_tasks': in_progress_tasks,
             'blocked_tasks': blocked_tasks,
+            'todo_tasks': all_tasks.filter(status='todo').count(),
             'total_team_members': employees.count(),
             'completion_rate': round((completed_tasks / total_tasks * 100)) if total_tasks > 0 else 0,
             'recent_projects': recent_projects,

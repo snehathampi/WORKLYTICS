@@ -308,6 +308,15 @@ const SimModule = (() => {
             <option value="blocked"     ${task.status==='blocked'     ?'selected':''}>Blocked</option>
           </select>
         </td>
+        <td>
+          <button class="sim-delete-task-btn" title="Delete task"
+            onclick="SimModule._deleteTask(${pid}, ${task.id})">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0h10"/>
+            </svg>
+          </button>
+        </td>
       </tr>`;
     }).join('');
 
@@ -366,6 +375,7 @@ const SimModule = (() => {
               <th style="width:130px;">Due Date</th>
               <th style="width:80px;">Priority</th>
               <th style="width:120px;">Status</th>
+              <th style="width:50px;"></th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -540,6 +550,33 @@ const SimModule = (() => {
     }
     return null;
   }
+
+  async function _deleteTask(pid, taskId) {
+    if (!confirm('Delete this task? This will also remove any dependencies on it.')) return;
+
+    const data = await apiPost(`/core/api/tasks/${taskId}/delete/`, {});
+
+    if (data.success) {
+      // Remove from sandbox state if loaded
+      const ps = _getProjectState(pid);
+      if (ps) {
+        ps.sandboxTasks = ps.sandboxTasks.filter(t => t.id !== taskId);
+      }
+      _showToast('Task deleted', 'success');
+      // Refresh project cards and dashboard
+      if (typeof loadDashboardData === 'function') {
+        await loadDashboardData();
+      }
+      // Reload project state fresh and re-render card
+      delete _state.projectStates[pid];
+      _state.expandedCards[pid] = true;
+      const ok = await _ensureProjectLoaded(pid);
+      if (ok) _refreshCard(pid);
+    } else {
+      _showToast(data.error || 'Failed to delete task', 'error');
+    }
+  }
+
 
   /* ═══════════════════════════════════════════════════════════════
      SECTION 6 – FULL SANDBOX (Run Simulation)
@@ -1387,6 +1424,14 @@ const SimModule = (() => {
       font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;
       text-transform:uppercase;flex-shrink:0;align-self:flex-start;
     }
+      .sim-delete-task-btn {
+      background:none;border:1px solid #fca5a5;border-radius:6px;
+      width:28px;height:28px;display:inline-flex;align-items:center;
+      justify-content:center;cursor:pointer;color:#ef4444;
+      transition:background .15s;
+    }
+    .sim-delete-task-btn:hover { background:#fef2f2; 
+    }
     .sim-spinner {
       width:18px;height:18px;border:2px solid #e5e7eb;
       border-top-color:#6366f1;border-radius:50%;animation:simSpin .7s linear infinite;
@@ -1456,6 +1501,7 @@ const SimModule = (() => {
     _onSandboxStatus,
     _onSandboxDeadline,
     _applyHint,
+    _deleteTask,
   };
 
 })();
