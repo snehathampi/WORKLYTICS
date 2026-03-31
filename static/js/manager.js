@@ -28,6 +28,7 @@ let simulationActive = false;
 let currentAddTaskProjectId = null;
 let currentEditProjectId = null;
 let currentEditTaskId = null;
+let _lastDashboardData = null;   // ← store full API response here
 
 // ── INITIALIZE ────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
@@ -64,7 +65,8 @@ function loadDashboardData() {
         if (data) {
             console.log('📁 all_projects:', data.all_projects);
             console.log('📁 all_projects length:', data.all_projects ? data.all_projects.length : 0);
-            
+
+            _lastDashboardData = data;   // ← cache the full response
             projects = data.all_projects || [];
             employees = data.employee_workload || [];
             allEmployees = data.all_employees || [];
@@ -123,14 +125,7 @@ function showPage(page) {
     if (navBtn) navBtn.classList.add('active');
 
     if (page === 'home') {
-        initHomeCharts({
-            completed_tasks: (employeeWorkload || []).reduce((s, e) => s + (e.completed || 0), 0),
-            in_progress_tasks: (employeeWorkload || []).reduce((s, e) => s + (e.inProgress || 0), 0),
-            blocked_tasks: 0,
-            all_tasks: allTasks,
-            employee_workload: employeeWorkload,
-            weekly_activity: null,
-        });
+        if (_lastDashboardData) initHomeCharts(_lastDashboardData);
     }
     if (page === 'projects') renderProjects();
     if (page === 'workload') renderEmployeeDetails();

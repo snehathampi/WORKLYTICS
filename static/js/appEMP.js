@@ -44,6 +44,48 @@ document.addEventListener('DOMContentLoaded', function() {
     loadDashboardData();
 });
 
+// ── SIDEBAR PROJECTS ────────────────────────────────
+function renderSidebarProjects(allTasks) {
+    const container = document.getElementById('sidebarProjectsList');
+    if (!container) return;
+
+    if (!allTasks || allTasks.length === 0) {
+        container.innerHTML = '<p style="color:#6b7280;font-size:12px;padding:6px 10px;">No projects yet</p>';
+        return;
+    }
+
+    // Group tasks by project name
+    const grouped = {};
+    allTasks.forEach(t => {
+        if (t.status === 'completed' || t.status === 'blocked') return;
+        const pname = t.project || 'Unknown';
+        if (!grouped[pname]) grouped[pname] = [];
+        grouped[pname].push(t.title);
+    });
+
+    const dotColors = ['#6366f1','#22c55e','#f59e0b','#06b6d4','#ef4444','#8b5cf6'];
+
+    container.innerHTML = Object.entries(grouped).map(([project, taskTitles], idx) => {
+        const color = dotColors[idx % dotColors.length];
+        return `
+            <div class="sidebar-project-group">
+                <div class="sidebar-project-entry">
+                    <span class="sidebar-project-dot" style="background:${color};"></span>
+                    <span class="sidebar-project-label">${project}</span>
+                </div>
+                <div class="sidebar-task-list">
+                    ${taskTitles.map(title => `
+                        <div class="sidebar-task-item">
+                            <span class="sidebar-task-dash">—</span>
+                            <span class="sidebar-task-name">${title}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
 // ── LOAD ALL DASHBOARD DATA ─────────────────────────
 function loadDashboardData() {
     fetch('/core/api/employee/dashboard/', {
@@ -61,14 +103,20 @@ function loadDashboardData() {
             due: t.due_date,
             priority: t.priority,
             status: STATUS_MAP[t.status] || t.status,
+            rawStatus: t.status,
             done: t.status === 'completed',
             project: t.project,
+            manager: t.manager || '—',
+            estimated_hours: t.estimated_hours || 0,
+            actual_hours: t.actual_hours ?? null,
             is_overdue: t.is_overdue,
             has_pending_dependencies: t.has_pending_dependencies
         }));
         
+        renderSidebarProjects(data.all_tasks || []);
+
         updateHomePage();
-        
+
         const activePage = document.querySelector('.page.active')?.id;
         if (activePage === 'page-tasks') renderTasks();
         if (activePage === 'page-workload') renderWorkloadPage();
@@ -123,39 +171,69 @@ function updateHomePage() {
     }
     
     updateHomeCharts();
+
+    // Update status legend to match all 4 statuses
+    const legendEl = document.querySelector('.status-legend');
+    if (legendEl) {
+        legendEl.innerHTML = `
+            <span><span class="legend-dot" style="background:#d1d5db;"></span> To Do</span>
+            <span><span class="legend-dot" style="background:#6366f1;"></span> In Prog</span>
+            <span><span class="legend-dot" style="background:#22c55e;"></span> Done</span>
+            <span><span class="legend-dot" style="background:#f59e0b;"></span> Blocked</span>
+        `;
+    }
     
     const recentTasksList = document.getElementById('recentTasksList');
     if (recentTasksList && employeeData.recent_tasks) {
-        recentTasksList.innerHTML = employeeData.recent_tasks.map(t => `
-            <div class="task-item" onclick="viewTaskDetails(${t.id})">
-                <div class="task-item-title">${t.title}</div>
-                <div class="task-item-meta">
-                    <span class="task-priority priority-${t.priority}">${t.priority}</span>
-                    <span class="task-status status-${t.status}">${STATUS_MAP[t.status] || t.status}</span>
-                </div>
-                ${t.has_pending_dependencies ? '<span class="badge-warning">⛔ Blocked</span>' : ''}
-            </div>
-        `).join('');
+        if (employeeData.recent_tasks.length === 0) {
+            recentTasksList.innerHTML = '<div class="recent-empty">No tasks yet.</div>';
+        } else {
+            recentTasksList.innerHTML = employeeData.recent_tasks.map(t => {
+                const statusLabel = STATUS_MAP[t.status] || t.status;
+                const statusKey   = t.status; // raw key e.g. 'in_progress'
+                return `
+                <div class="recent-task-row" onclick="showPage('tasks')">
+                    <div class="recent-task-left">
+                        <span class="recent-dot priority-dot-${t.priority}"></span>
+                        <span class="recent-task-name">${t.title}</span>
+                        ${t.has_pending_dependencies ? '<span class="recent-blocked-badge">⛔</span>' : ''}
+                    </div>
+                    <div class="recent-task-right">
+                        <span class="recent-project">${t.project || ''}</span>
+                        <span class="recent-status-pill status-pill-${statusKey}">${statusLabel}</span>
+                        <span class="recent-priority-pill priority-pill-${t.priority}">${t.priority}</span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
     }
 }
 
 function updateHomeCharts() {
+    // ── Status Donut: Todo + In Progress + Completed + Blocked ──
     const statusCtx = document.getElementById('statusChart');
-    if (statusCtx && statusCtx._chartInstance) {
-        statusCtx._chartInstance.destroy();
-    }
-    
+    if (statusCtx && statusCtx._chartInstance) statusCtx._chartInstance.destroy();
+
     if (statusCtx) {
+        const todo       = employeeData.total_tasks
+                           - (employeeData.in_progress_tasks || 0)
+                           - (employeeData.completed_tasks   || 0)
+                           - (employeeData.blocked_tasks     || 0);
+        const inProgress = employeeData.in_progress_tasks || 0;
+        const completed  = employeeData.completed_tasks   || 0;
+        const blocked    = employeeData.blocked_tasks     || 0;
+
+        const hasData = (todo + inProgress + completed + blocked) > 0;
+
         statusCtx._chartInstance = new Chart(statusCtx, {
             type: 'doughnut',
             data: {
-                labels: ['In Progress', 'Done'],
+                labels: ['To Do', 'In Progress', 'Completed', 'Blocked'],
                 datasets: [{
-                    data: [
-                        employeeData.in_progress_tasks || 1,
-                        employeeData.completed_tasks || 1
-                    ],
-                    backgroundColor: ['#6366f1', '#22c55e'],
+                    data: hasData
+                        ? [todo, inProgress, completed, blocked]
+                        : [1, 0, 0, 0],
+                    backgroundColor: ['#d1d5db', '#6366f1', '#22c55e', '#f59e0b'],
                     borderWidth: 0,
                     hoverOffset: 4
                 }]
@@ -167,12 +245,11 @@ function updateHomeCharts() {
             }
         });
     }
-    
+
+    // ── Priority Bar ──
     const priorityCtx = document.getElementById('priorityChart');
-    if (priorityCtx && priorityCtx._chartInstance) {
-        priorityCtx._chartInstance.destroy();
-    }
-    
+    if (priorityCtx && priorityCtx._chartInstance) priorityCtx._chartInstance.destroy();
+
     if (priorityCtx) {
         priorityCtx._chartInstance = new Chart(priorityCtx, {
             type: 'bar',
@@ -180,11 +257,11 @@ function updateHomeCharts() {
                 labels: ['High', 'Medium', 'Low'],
                 datasets: [{
                     data: [
-                        employeeData.high_priority_tasks || 0,
+                        employeeData.high_priority_tasks   || 0,
                         employeeData.medium_priority_tasks || 0,
-                        employeeData.low_priority_tasks || 0
+                        employeeData.low_priority_tasks    || 0
                     ],
-                    backgroundColor: ['#6366f1', '#8b5cf6', '#a78bfa'],
+                    backgroundColor: ['#ef4444', '#f59e0b', '#22c55e'],
                     borderRadius: 4,
                     borderSkipped: false
                 }]
@@ -261,46 +338,74 @@ function renderTasks() {
                     <div class="task-table-head">
                         <span>Name</span>
                         <span>Project</span>
+                        <span>Assigned By</span>
+                        <span>Est. Hours</span>
+                        <span>Logged Hours</span>
                         <span>Due date</span>
                         <span>Priority</span>
                         <span>Status</span>
                         <span>Actions</span>
                     </div>
-                    ${groupTasks.map(t => `
+                    ${groupTasks.map(t => {
+                        const canStart    = t.status !== 'To do' && t.status !== 'Doing' && t.status !== 'Done' && !t.has_pending_dependencies;
+                        const canComplete = t.status !== 'Done' && !t.has_pending_dependencies;
+                        const canLog      = t.status === 'Doing';
+                        const logTitle    = t.status === 'To do'
+                            ? 'Start the task before logging hours'
+                            : t.has_pending_dependencies
+                                ? 'Blocked — complete dependencies first'
+                                : 'Log hours';
+                        return `
                         <div class="task-row" data-id="${t.id}">
                             <div class="task-name-cell">
                                 <div class="task-checkbox ${t.done ? 'done' : ''}" onclick="toggleDone(${t.id})"></div>
                                 <span class="task-name ${t.done ? 'done' : ''}">${t.name}</span>
                                 ${t.has_pending_dependencies ? '<span class="badge-warning" title="Has pending dependencies">⛔</span>' : ''}
                             </div>
-                            <div class="project-cell">${t.project || '-'}</div>
+                            <div class="project-cell">${t.project || '—'}</div>
+                            <div class="manager-cell">
+                                <svg width="11" height="11" fill="none" stroke="#6b7280" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                                </svg>
+                                ${t.manager}
+                            </div>
+                            <div class="hours-cell">${t.estimated_hours}h</div>
+                            <div class="hours-cell logged ${t.actual_hours !== null ? 'has-logged' : 'no-logged'}">
+                                ${t.actual_hours !== null ? t.actual_hours + 'h' : '—'}
+                            </div>
                             <div class="due-date ${isOverdue(t.due) && !t.done ? 'overdue' : ''}">${t.due}</div>
                             <div><span class="badge ${t.priority}">${t.priority}</span></div>
                             <div>
                                 <span class="status-badge status-${t.status}">${t.status}</span>
                             </div>
-                            <div>
-                                <button class="btn-icon" onclick="updateTaskStatus(${t.id}, 'in_progress')" 
-                                    title="${t.has_pending_dependencies ? 'Blocked — complete dependencies first' : 'Start task'}" 
-                                    ${t.status === 'in_progress' || t.status === 'completed' || t.has_pending_dependencies ? 'disabled' : ''}
-                                    style="${t.has_pending_dependencies ? 'opacity:0.35;cursor:not-allowed;' : ''}">                                    
+                            <div style="display:flex;gap:4px;align-items:center;">
+                                <button class="btn-icon" onclick="updateTaskStatus(${t.id}, 'in_progress')"
+                                    title="${t.has_pending_dependencies ? 'Blocked — complete dependencies first' : 'Start task'}"
+                                    ${t.status === 'Doing' || t.status === 'Done' || t.has_pending_dependencies ? 'disabled' : ''}
+                                    style="${t.status === 'Doing' || t.status === 'Done' || t.has_pending_dependencies ? 'opacity:0.35;cursor:not-allowed;' : ''}">
                                     <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                         <polygon points="5 3 19 12 5 21 5 3"/>
                                     </svg>
                                 </button>
-                                <button class="btn-icon" onclick="updateTaskStatus(${t.id}, 'completed')" title="${t.has_pending_dependencies ? 'Blocked — complete dependencies first' : 'Complete'}" ${t.status === 'completed' || t.has_pending_dependencies ? 'disabled' : ''} style="${t.has_pending_dependencies ? 'opacity:0.35;cursor:not-allowed;' : ''}">
+                                <button class="btn-icon" onclick="updateTaskStatus(${t.id}, 'completed')"
+                                    title="${t.has_pending_dependencies ? 'Blocked — complete dependencies first' : 'Mark complete'}"
+                                    ${t.status === 'Done' || t.has_pending_dependencies ? 'disabled' : ''}
+                                    style="${t.status === 'Done' || t.has_pending_dependencies ? 'opacity:0.35;cursor:not-allowed;' : ''}">
                                     <svg width="14" height="14" fill="none" stroke="#22c55e" stroke-width="2" viewBox="0 0 24 24">
                                         <polyline points="20 6 9 17 4 12"/>
                                     </svg>
                                 </button>
-                                <button class="btn-icon" onclick="logHours(${t.id})" title="${t.has_pending_dependencies ? 'Blocked — complete dependencies first' : 'Log hours'}" ${t.has_pending_dependencies ? 'disabled' : ''} style="${t.has_pending_dependencies ? 'opacity:0.35;cursor:not-allowed;' : ''}">
+                                <button class="btn-icon" onclick="logHours(${t.id})"
+                                    title="${logTitle}"
+                                    ${!canLog ? 'disabled' : ''}
+                                    style="${!canLog ? 'opacity:0.35;cursor:not-allowed;' : ''}">
                                     <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                         <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
                                     </svg>
                                 </button>
                             </div>
-                        </div>
-                    `).join('')}
+                        </div>`;
+                    }).join('')}
                 </div>
             </div>
         `;
@@ -380,7 +485,12 @@ function updateTaskStatus(taskId, newStatus) {
 
 function logHours(taskId) {
     const task = tasks.find(t => t.id === taskId);
-    if (task && task.has_pending_dependencies) {
+    if (!task) return;
+    if (task.status !== 'Doing') {
+        showNotification('⏱ Start the task first before logging hours', 'error');
+        return;
+    }
+    if (task.has_pending_dependencies) {
         showNotification('⛔ Cannot log hours — complete dependencies first', 'error');
         return;
     }
@@ -405,6 +515,9 @@ function logHours(taskId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            const t = tasks.find(t => t.id === taskId);
+            if (t) t.actual_hours = hoursNum;
+            renderTasks();
             showNotification(`Logged ${hoursNum} hours`, 'success');
         } else {
             showNotification('Error: ' + data.error, 'error');
@@ -449,71 +562,216 @@ function renderWorkloadPage() {
 }
 
 function updateWorkloadUI() {
-    const metricVals = document.querySelectorAll('.metric-val');
-    if (metricVals.length >= 2) {
-        metricVals[0].textContent = workloadData.total_hours + 'h';
-        metricVals[1].textContent = (workloadData.workload_percentage || 0) + '%';
+    const pct      = workloadData.workload_percentage || 0;
+    const hours    = workloadData.total_hours         || 0;
+    const capacity = workloadData.capacity            || 160;
+    const onTimePct   = workloadData.on_time_percentage ?? 0;
+    const onTimeCount = workloadData.on_time_count      ?? 0;
+    const completedCount = workloadData.completed_task_count ?? 0;
+    const efficiency  = workloadData.efficiency         ?? 0;
+
+    // ── Metric card 1: Total Workload ──
+    const el_totalHours = document.getElementById('totalWorkloadHours');
+    const el_capacityHours = document.getElementById('capacityHours');
+    const el_workloadProgress = document.getElementById('workloadProgress');
+    if (el_totalHours)      el_totalHours.textContent    = hours + 'h';
+    if (el_capacityHours)   el_capacityHours.textContent = capacity + 'h capacity';
+    if (el_workloadProgress) {
+        const fillPct = Math.min(pct, 100);
+        el_workloadProgress.style.width = fillPct + '%';
+        // colour the bar by load
+        el_workloadProgress.style.background =
+            pct > 100 ? 'linear-gradient(90deg,#ef4444,#f87171)' :
+            pct > 80  ? 'linear-gradient(90deg,#f59e0b,#fbbf24)' :
+                        'linear-gradient(90deg,#6366f1,#8b5cf6)';
     }
-    
-    const metricSubs = document.querySelectorAll('.metric-sub');
-    if (metricSubs.length >= 2) {
-        metricSubs[0].textContent = workloadData.capacity + 'h capacity';
-        
-        let status = 'Balanced';
-        let statusColor = '#22c55e';
-        const percent = workloadData.workload_percentage || 0;
-        
-        if (percent > 100) {
-            status = 'Overloaded';
-            statusColor = '#ef4444';
-        } else if (percent > 80) {
-            status = 'Busy';
-            statusColor = '#f59e0b';
-        } else if (percent < 50) {
-            status = 'Underutilized';
-            statusColor = '#3b82f6';
+
+    // ── Metric card 2: Utilization ──
+    let utilizationStatus = 'Balanced';
+    let utilizationColor  = '#22c55e';
+    if (pct > 100)     { utilizationStatus = 'Overloaded';    utilizationColor = '#ef4444'; }
+    else if (pct > 80) { utilizationStatus = 'Busy';          utilizationColor = '#f59e0b'; }
+    else if (pct < 50) { utilizationStatus = 'Underutilized'; utilizationColor = '#3b82f6'; }
+
+    const el_utilization       = document.getElementById('utilization');
+    const el_utilizationStatus = document.getElementById('utilizationStatus');
+    if (el_utilization)       el_utilization.textContent       = pct + '%';
+    if (el_utilizationStatus) {
+        el_utilizationStatus.textContent = utilizationStatus;
+        el_utilizationStatus.style.color = utilizationColor;
+    }
+
+    // ── Metric card 3: On-Time Delivery ──
+    const el_onTimePct   = document.getElementById('onTimePercentage');
+    const el_onTimeCount = document.getElementById('onTimeCount');
+    if (el_onTimePct)   el_onTimePct.textContent   = onTimePct + '%';
+    if (el_onTimeCount) el_onTimeCount.textContent =
+        completedCount === 0
+            ? 'No completed tasks yet'
+            : `${onTimeCount} of ${completedCount} tasks on time`;
+
+    // ── Metric card 4: Efficiency ──
+    const el_efficiency = document.getElementById('efficiency');
+    if (el_efficiency) el_efficiency.textContent = efficiency + '%';
+
+    // ── Capacity card ──
+    const el_allocatedHours  = document.getElementById('allocatedHours');
+    const el_workloadBadge   = document.getElementById('workloadBadge');
+    const el_capacityProgress = document.getElementById('capacityProgress');
+    const el_warningBox      = document.getElementById('warningBox');
+    const el_warningMessage  = document.getElementById('warningMessage');
+
+    if (el_allocatedHours)
+        el_allocatedHours.textContent = `${hours}h of ${capacity}h monthly capacity`;
+
+    if (el_workloadBadge) {
+        el_workloadBadge.textContent = pct + '% Utilized';
+        el_workloadBadge.style.cssText =
+            `padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;background:${
+                pct > 100 ? '#ef4444' : pct > 80 ? '#f59e0b' : '#22c55e'
+            }`;
+    }
+
+    if (el_capacityProgress) {
+        el_capacityProgress.style.width = Math.min(pct, 100) + '%';
+        el_capacityProgress.style.background =
+            pct > 100 ? 'linear-gradient(90deg,#ef4444,#f87171)' :
+            pct > 80  ? 'linear-gradient(90deg,#f59e0b,#fbbf24)' :
+                        'linear-gradient(90deg,#6366f1,#8b5cf6)';
+    }
+
+    if (el_warningBox && el_warningMessage) {
+        if (pct > 100) {
+            el_warningBox.style.display = 'flex';
+            el_warningMessage.textContent =
+                `You are ${Math.round(hours - capacity)}h over capacity. Consider discussing task redistribution with your manager.`;
+        } else if (pct > 80) {
+            el_warningBox.style.display = 'flex';
+            el_warningBox.style.background = '#fffbeb';
+            el_warningBox.style.borderColor = '#fcd34d';
+            el_warningBox.style.color = '#92400e';
+            el_warningBox.querySelector('svg').setAttribute('stroke', '#f59e0b');
+            el_warningMessage.textContent =
+                `You're approaching full capacity (${pct}%). Keep an eye on your workload.`;
+        } else {
+            el_warningBox.style.display = 'none';
         }
-        
-        metricSubs[1].textContent = status;
-        metricSubs[1].style.color = statusColor;
-    }
-    
-    const progressBar = document.querySelector('.capacity-card .progress-fill');
-    if (progressBar) {
-        progressBar.style.width = Math.min(workloadData.workload_percentage || 0, 100) + '%';
     }
 }
 
 function renderWorkloadChart() {
     const canvas = document.getElementById('workloadChart');
     if (!canvas) return;
-    
-    if (canvas._chartInstance) {
-        canvas._chartInstance.destroy();
-    }
+    if (canvas._chartInstance) canvas._chartInstance.destroy();
 
     const projectData = workloadData.project_workload || [];
-    
+
+    if (projectData.length === 0) {
+        canvas.style.display = 'none';
+        let empty = canvas.parentElement.querySelector('.chart-empty');
+        if (!empty) {
+            empty = document.createElement('div');
+            empty.className = 'chart-empty';
+            empty.style.cssText = 'text-align:center;padding:40px;color:#9ca3af;font-size:13px;';
+            empty.textContent = 'No active project workload to display.';
+            canvas.parentElement.appendChild(empty);
+        }
+        return;
+    }
+
+    canvas.style.display = '';
+    const empty = canvas.parentElement.querySelector('.chart-empty');
+    if (empty) empty.remove();
+
+    const capacity = workloadData.capacity || 160;
+
     canvas._chartInstance = new Chart(canvas, {
         type: 'bar',
         data: {
             labels: projectData.map(p => p.project),
-            datasets: [{
-                data: projectData.map(p => p.hours),
-                backgroundColor: projectData.map(p => p.color || '#3b82f6'),
-                borderRadius: 4,
-                borderSkipped: false
-            }]
+            datasets: [
+                {
+                    label: 'Allocated Hours',
+                    data: projectData.map(p => p.hours),
+                    backgroundColor: projectData.map(p => (p.color || '#6366f1') + 'cc'),
+                    borderColor:     projectData.map(p => p.color || '#6366f1'),
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    borderSkipped: false,
+                    barPercentage: 0.55,
+                }
+            ]
         },
         options: {
-            plugins: { 
-                legend: { display: false }
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1a1d2e',
+                    titleColor: '#fff',
+                    bodyColor: '#9ca3af',
+                    padding: 10,
+                    cornerRadius: 8,
+                    callbacks: {
+                        label: ctx => {
+                            const h = ctx.parsed.y;
+                            const share = capacity > 0 ? Math.round((h / capacity) * 100) : 0;
+                            return [`  ${h}h allocated`, `  ${share}% of ${capacity}h capacity`];
+                        }
+                    }
+                }
             },
             scales: {
-                x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-                y: { beginAtZero: true, grid: { color: '#f3f4f6' } }
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        font: { size: 12, weight: '500' },
+                        color: '#6b7280',
+                        maxRotation: 0,
+                    },
+                    border: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f3f4f6', drawBorder: false },
+                    ticks: {
+                        font: { size: 11 },
+                        color: '#9ca3af',
+                        callback: val => val + 'h'
+                    },
+                    border: { display: false },
+                    // draw a dashed capacity line
+                    afterDataLimits(axis) {
+                        // let Chart.js auto-scale; just add 15% headroom above the tallest bar
+                        axis.max = axis.max * 1.15;
+                    }
+                }
+            },
+            // capacity reference line via annotation-free approach
+            animation: { duration: 600, easing: 'easeOutQuart' }
+        },
+        plugins: [{
+            id: 'capacityLine',
+            afterDraw(chart) {
+                const { ctx, scales: { y }, chartArea: { left, right, top } } = chart;
+                // only draw the line if capacity falls within the visible Y range
+                if (capacity > y.max || capacity < y.min) return;
+                const yPos = y.getPixelForValue(capacity);
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([6, 4]);
+                ctx.strokeStyle = '#ef444466';
+                ctx.lineWidth = 1.5;
+                ctx.moveTo(left, yPos);
+                ctx.lineTo(right, yPos);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.font = '10px DM Sans, sans-serif';
+                ctx.fillStyle = '#ef4444';
+                ctx.fillText(`Capacity: ${capacity}h`, right - 85, yPos - 5);
+                ctx.restore();
             }
-        }
+        }]
     });
 }
 

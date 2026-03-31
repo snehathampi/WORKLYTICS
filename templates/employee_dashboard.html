@@ -135,14 +135,9 @@
     </button>
 
     <div class="sidebar-section-label">Projects</div>
-    {% for project in user_projects %}
-    <button class="sidebar-link">
-      <span class="sidebar-project-dot" style="background:{{ project.color|default:'#6366f1' }};"></span>
-      {{ project.name }}
-    </button>
-    {% empty %}
-    <p style="color: #6b7280; font-size: 12px; padding: 10px;">No projects yet</p>
-    {% endfor %}
+    <div id="sidebarProjectsList">
+      <p style="color:#6b7280;font-size:12px;padding:6px 10px;">Loading...</p>
+    </div>
 
     <div class="sidebar-bottom">
       <div class="invite-btn">

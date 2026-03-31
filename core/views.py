@@ -862,7 +862,7 @@ def manager_dashboard_data(request):
         employee_workload = []
         for emp in employees:
             try:
-                emp_tasks = Task.objects.filter(assigned_to=emp, status__in=['todo', 'in_progress', 'blocked'])
+                emp_tasks = Task.objects.filter(assigned_to=emp, status__in=['todo', 'in_progress'])
                 total_hours = emp_tasks.aggregate(total=Sum('estimated_hours'))['total'] or 0
                 task_count = emp_tasks.count()
                 completed = Task.objects.filter(assigned_to=emp, status='completed').count()
@@ -1075,14 +1075,15 @@ def employee_dashboard_data(request):
         completion_rate = round((completed_count / total_tasks * 100)) if total_tasks > 0 else 0
         
         # Hours
-        estimated_hours = all_tasks.aggregate(total=Sum('estimated_hours'))['total'] or 0
-        actual_hours = all_tasks.filter(actual_hours__isnull=False).aggregate(total=Sum('actual_hours'))['total'] or 0
+        non_blocked = all_tasks.exclude(status='blocked')
+        estimated_hours = non_blocked.aggregate(total=Sum('estimated_hours'))['total'] or 0
+        actual_hours = non_blocked.filter(actual_hours__isnull=False).aggregate(total=Sum('actual_hours'))['total'] or 0
         variance = abs(actual_hours - estimated_hours)
         
         # Priority counts
-        high_priority = all_tasks.filter(priority='high', status__in=['todo', 'in_progress', 'blocked']).count()
-        medium_priority = all_tasks.filter(priority='medium', status__in=['todo', 'in_progress', 'blocked']).count()
-        low_priority = all_tasks.filter(priority='low', status__in=['todo', 'in_progress', 'blocked']).count()
+        high_priority = all_tasks.filter(priority='high', status__in=['todo', 'in_progress']).count()
+        medium_priority = all_tasks.filter(priority='medium', status__in=['todo', 'in_progress']).count()
+        low_priority = all_tasks.filter(priority='low', status__in=['todo', 'in_progress']).count()
         
         # Recent tasks
         recent_tasks = []
@@ -1103,9 +1104,12 @@ def employee_dashboard_data(request):
                 'id': t.id,
                 'title': t.title,
                 'project': t.project.name,
+                'manager': t.project.manager.name,
                 'priority': t.priority,
                 'status': t.status,
                 'due_date': t.due_date.strftime('%Y-%m-%d'),
+                'estimated_hours': t.estimated_hours,
+                'actual_hours': t.actual_hours,
                 'is_overdue': t.is_overdue,
                 'has_pending_dependencies': t.has_pending_dependencies
             })
@@ -1186,7 +1190,7 @@ def get_my_workload(request):
         
         # Get tasks
         all_tasks = Task.objects.filter(assigned_to=employee)
-        active_tasks = all_tasks.filter(status__in=['todo', 'in_progress', 'blocked'])
+        active_tasks = all_tasks.filter(status__in=['todo', 'in_progress'])
         completed_tasks = all_tasks.filter(status='completed')
         
         # Calculate workload
@@ -1206,14 +1210,35 @@ def get_my_workload(request):
                     'color': project.color
                 })
         
+        # On-time delivery: completed tasks where completed_date <= due_date
+        completed_list = completed_tasks.exclude(completed_date__isnull=True)
+        on_time = completed_list.filter(completed_date__lte=models.F('due_date')).count()
+        total_completed = completed_list.count()
+        on_time_pct = round((on_time / total_completed) * 100) if total_completed > 0 else 0
+
+        # Efficiency: how accurately estimated hours match actual hours
+        # Only tasks with both estimated and actual hours logged
+        logged_tasks = all_tasks.filter(actual_hours__isnull=False, estimated_hours__gt=0)
+        efficiency = 0
+        if logged_tasks.exists():
+            ratios = [
+                min(t.actual_hours, t.estimated_hours) / max(t.actual_hours, t.estimated_hours)
+                for t in logged_tasks
+                if t.actual_hours > 0
+            ]
+            efficiency = round((sum(ratios) / len(ratios)) * 100) if ratios else 0
+
         return JsonResponse({
             'total_hours': total_hours,
             'capacity': capacity,
             'workload_percentage': workload_percentage,
             'project_workload': project_workload,
             'active_task_count': active_tasks.count(),
-            'completed_task_count': completed_tasks.count(),
-            'blocked_task_count': active_tasks.filter(status='blocked').count()
+            'completed_task_count': total_completed,
+            'blocked_task_count': active_tasks.filter(status='blocked').count(),
+            'on_time_count': on_time,
+            'on_time_percentage': on_time_pct,
+            'efficiency': efficiency,
         })
     except Employee.DoesNotExist:
         return JsonResponse({'error': 'Employee not found'}, status=404)
