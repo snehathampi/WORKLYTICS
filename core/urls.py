@@ -27,4 +27,10 @@ urlpatterns = [
     path('api/employee/dashboard/', views.employee_dashboard_data, name='employee_dashboard_data'),
     path('api/employee/tasks/', views.get_my_tasks, name='get_my_tasks'),
     path('api/employee/workload/', views.get_my_workload, name='get_my_workload'),
+
+    # Profile API endpoints
+    path('api/manager/profile/',       views.manager_profile_get,   name='manager_profile_get'),
+    path('api/manager/profile/save/',  views.manager_profile_save,  name='manager_profile_save'),
+    path('api/employee/profile/',      views.employee_profile_get,  name='employee_profile_get'),
+    path('api/employee/profile/save/', views.employee_profile_save, name='employee_profile_save'),
 ]

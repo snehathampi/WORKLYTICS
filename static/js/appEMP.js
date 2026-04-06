@@ -288,8 +288,9 @@ function showPage(page) {
     const navBtn = document.getElementById('nav-' + page);
     if (navBtn) navBtn.classList.add('active');
     
-    if (page === 'tasks') renderTasks();
+    if (page === 'tasks') { switchTaskTab('list'); renderTasks(); }
     if (page === 'workload') renderWorkloadPage();
+    if (page === 'profile') loadEmployeeProfileData();
 }
 
 function toggleSidebar() {
@@ -307,6 +308,105 @@ document.addEventListener('click', e => {
         dd.classList.remove('open');
     }
 });
+
+// ── PROFILE PAGE ────────────────────────────────────
+let empSkills = [];
+
+function loadEmployeeProfileData() {
+    fetch('/core/api/employee/profile/', {
+        credentials: 'include',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        const expInput = document.getElementById('emp-experience-input');
+        if (expInput && data.experience !== undefined && data.experience !== null) {
+            expInput.value = data.experience;
+        }
+        if (data.skills) {
+            empSkills = Array.isArray(data.skills)
+                ? data.skills
+                : data.skills.split(',').map(s => s.trim()).filter(Boolean);
+        } else {
+            // Fall back to pre-filled value from Django template if available
+            const prefilledSkills = document.getElementById('emp-skills-prefill')?.value;
+            if (prefilledSkills) {
+                empSkills = prefilledSkills.split(',').map(s => s.trim()).filter(Boolean);
+            }
+        }
+        renderEmpSkillTags();
+    })
+    .catch(() => {
+        renderEmpSkillTags();
+    });
+}
+
+function renderEmpSkillTags() {
+    const container = document.getElementById('emp-skills-tags');
+    if (!container) return;
+    container.innerHTML = empSkills.map((skill, i) => `
+        <span style="display:inline-flex;align-items:center;gap:5px;background:#ede9fe;color:#6d28d9;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500;">
+            ${skill}
+            <span onclick="empRemoveSkill(${i})" style="cursor:pointer;font-size:14px;line-height:1;color:#a78bfa;margin-left:2px;">×</span>
+        </span>
+    `).join('');
+}
+
+function empRemoveSkill(index) {
+    empSkills.splice(index, 1);
+    renderEmpSkillTags();
+}
+
+function empAddSkillFromInput() {
+    const input = document.getElementById('emp-skill-input');
+    if (!input) return;
+    const val = input.value.trim().replace(/,$/, '');
+    if (val && !empSkills.includes(val)) {
+        empSkills.push(val);
+        renderEmpSkillTags();
+    }
+    input.value = '';
+    input.focus();
+}
+
+function empSkillInputKeydown(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        empAddSkillFromInput();
+    }
+}
+
+function saveEmployeeProfile() {
+    const experience = document.getElementById('emp-experience-input')?.value;
+
+    fetch('/core/api/employee/profile/save/', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ experience, skills: empSkills.join(', ') })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showEmpNotification('Profile saved successfully', 'success');
+        } else {
+            showEmpNotification('Error: ' + (data.error || 'Could not save'), 'error');
+        }
+    })
+    .catch(() => showEmpNotification('Failed to save profile', 'error'));
+}
+
+function showEmpNotification(message, type = 'success') {
+    const n = document.createElement('div');
+    n.textContent = message;
+    n.style.cssText = `position:fixed;top:20px;right:20px;padding:12px 20px;background:${type === 'success' ? '#22c55e' : '#ef4444'};color:white;border-radius:8px;font-size:14px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.15);`;
+    document.body.appendChild(n);
+    setTimeout(() => n.remove(), 3000);
+}
 
 // ── TASKS RENDER ────────────────────────────────────
 function isOverdue(dateStr) {
@@ -800,4 +900,272 @@ function showNotification(message, type = 'success') {
         notification.style.animation = 'slideOut 0.3s ease';
         setTimeout(() => notification.remove(), 300);
     }, 3000);
+}
+// ══════════════════════════════════════
+// TASK TAB SWITCHING
+// ══════════════════════════════════════
+let currentTaskTab = 'list';
+
+function switchTaskTab(tab) {
+    currentTaskTab = tab;
+    document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.remove('active'));
+    const activeTab = document.getElementById('tab-' + tab);
+    if (activeTab) activeTab.classList.add('active');
+
+    document.getElementById('tasksBody').style.display        = tab === 'list'     ? '' : 'none';
+    document.getElementById('subview-calendar').style.display = tab === 'calendar' ? '' : 'none';
+    document.getElementById('subview-files').style.display    = tab === 'files'    ? '' : 'none';
+
+    if (tab === 'calendar') renderCalendar();
+    if (tab === 'files')    renderFiles();
+}
+
+// ══════════════════════════════════════
+// CALENDAR
+// ══════════════════════════════════════
+let calCurrentDate  = new Date();
+let calSelectedDate = new Date();
+let calEvents = {}; // key: "YYYY-MM-DD", value: array of {title,time,type,notes}
+
+function calGoToday()   { calCurrentDate = new Date(); calSelectedDate = new Date(); renderCalendar(); }
+function calPrevMonth() { calCurrentDate = new Date(calCurrentDate.getFullYear(), calCurrentDate.getMonth()-1, 1); renderCalendar(); }
+function calNextMonth() { calCurrentDate = new Date(calCurrentDate.getFullYear(), calCurrentDate.getMonth()+1, 1); renderCalendar(); }
+
+function renderCalendar() {
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const year  = calCurrentDate.getFullYear();
+    const month = calCurrentDate.getMonth();
+    const el = document.getElementById('calMonthLabel');
+    if (el) el.textContent = MONTHS[month] + ' ' + year;
+
+    updateCalSidePanel();
+
+    const grid = document.getElementById('calGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const firstDay    = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+    const daysInPrev  = new Date(year, month, 0).getDate();
+    const today       = new Date();
+
+    const tasksByDate = {};
+    tasks.forEach(t => {
+        if (t.due) { if (!tasksByDate[t.due]) tasksByDate[t.due]=[]; tasksByDate[t.due].push(t); }
+    });
+
+    const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7 || 35;
+
+    for (let i = 0; i < totalCells; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cal-cell';
+
+        let dateObj, dayNum, isOther = false;
+        if (i < firstDay) {
+            dayNum = daysInPrev - firstDay + 1 + i;
+            dateObj = new Date(year, month-1, dayNum);
+            isOther = true;
+        } else if (i - firstDay >= daysInMonth) {
+            dayNum = i - firstDay - daysInMonth + 1;
+            dateObj = new Date(year, month+1, dayNum);
+            isOther = true;
+        } else {
+            dayNum = i - firstDay + 1;
+            dateObj = new Date(year, month, dayNum);
+        }
+
+        const dateStr = calDateKey(dateObj);
+        if (isOther)                         cell.classList.add('other-month');
+        if (calSameDay(dateObj, today))      cell.classList.add('today');
+        if (calSameDay(dateObj, calSelectedDate)) cell.classList.add('selected');
+
+        cell.innerHTML = '<div class="cal-day-num">' + dayNum + '</div>';
+
+        (tasksByDate[dateStr] || []).slice(0,2).forEach(t => {
+            const chip = document.createElement('div');
+            chip.className = 'cal-event-chip cal-chip-task';
+            chip.textContent = t.name;
+            cell.appendChild(chip);
+        });
+        (calEvents[dateStr] || []).slice(0,2).forEach(ev => {
+            const chip = document.createElement('div');
+            chip.className = 'cal-event-chip cal-chip-' + ev.type;
+            chip.textContent = ev.title;
+            cell.appendChild(chip);
+        });
+
+        cell.addEventListener('click', () => { calSelectedDate = dateObj; renderCalendar(); });
+        grid.appendChild(cell);
+    }
+}
+
+function updateCalSidePanel() {
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const dayEl   = document.getElementById('calSideDay');
+    const monthEl = document.getElementById('calSideMonthLabel');
+    if (dayEl)   dayEl.textContent   = calSelectedDate.getDate();
+    if (monthEl) monthEl.textContent = MONTHS[calSelectedDate.getMonth()] + ' ' + calSelectedDate.getFullYear();
+
+    const dateStr     = calDateKey(calSelectedDate);
+    const dayEvents   = calEvents[dateStr] || [];
+    const taskEvents  = tasks.filter(t => t.due === dateStr);
+    const total       = dayEvents.length + taskEvents.length;
+
+    const countEl = document.getElementById('calSideEventCount');
+    if (countEl) countEl.textContent = total + (total === 1 ? ' EVENT' : ' EVENTS');
+
+    const listEl = document.getElementById('calSideEvents');
+    if (!listEl) return;
+
+    if (total === 0) {
+        listEl.innerHTML = '<div class="cal-no-events"><div>No events this day</div><div style="color:rgba(255,255,255,0.3);cursor:pointer;margin-top:4px;" onclick="openEventModal()">+ Add one</div></div>';
+        return;
+    }
+    listEl.innerHTML = [
+        ...taskEvents.map(t => '<div class="cal-side-event-item"><div class="cal-side-event-title">📋 '+t.name+'</div><div class="cal-side-event-time">'+t.project+' · '+t.priority+'</div></div>'),
+        ...dayEvents.map(ev => '<div class="cal-side-event-item"><div class="cal-side-event-title">'+(ev.type==='reminder'?'🟡':ev.type==='event'?'🟢':'🟣')+' '+ev.title+'</div><div class="cal-side-event-time">'+(ev.time||'All day')+'</div></div>')
+    ].join('');
+}
+
+function calDateKey(d) {
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function calSameDay(a,b) {
+    return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+}
+
+function openEventModal() {
+    document.getElementById('eventTitle').value = '';
+    document.getElementById('eventDate').value  = calDateKey(calSelectedDate);
+    document.getElementById('eventTime').value  = '';
+    document.getElementById('eventType').value  = 'reminder';
+    document.getElementById('eventNotes').value = '';
+    document.getElementById('eventModalOverlay').style.display = 'flex';
+}
+function closeEventModal() {
+    document.getElementById('eventModalOverlay').style.display = 'none';
+}
+function saveEvent() {
+    const title = document.getElementById('eventTitle').value.trim();
+    if (!title) { showEmpNotification('Please enter a title', 'error'); return; }
+    const date  = document.getElementById('eventDate').value;
+    const time  = document.getElementById('eventTime').value;
+    const type  = document.getElementById('eventType').value;
+    const notes = document.getElementById('eventNotes').value.trim();
+    if (!calEvents[date]) calEvents[date] = [];
+    calEvents[date].push({ title, time, type, notes });
+    closeEventModal();
+    calSelectedDate = new Date(date + 'T00:00:00');
+    calCurrentDate  = new Date(calSelectedDate.getFullYear(), calSelectedDate.getMonth(), 1);
+    renderCalendar();
+    showEmpNotification('Event saved!', 'success');
+}
+
+// ══════════════════════════════════════
+// FILES
+// ══════════════════════════════════════
+let filesData = [];
+let currentFileCategory = 'All';
+let selectedFileId = null;
+
+const FILE_ICONS = {
+    pdf:{bg:'#fee2e2',icon:'📄'}, doc:{bg:'#dbeafe',icon:'📝'}, docx:{bg:'#dbeafe',icon:'📝'},
+    xls:{bg:'#dcfce7',icon:'📊'}, xlsx:{bg:'#dcfce7',icon:'📊'},
+    png:{bg:'#fce7f3',icon:'🖼️'}, jpg:{bg:'#fce7f3',icon:'🖼️'}, jpeg:{bg:'#fce7f3',icon:'🖼️'},
+    txt:{bg:'#f3f4f6',icon:'📃'}, default:{bg:'#f3f4f6',icon:'📁'}
+};
+
+function getFileExt(name) { return (name.split('.').pop()||'').toLowerCase(); }
+function getFileIcon(name) { return FILE_ICONS[getFileExt(name)] || FILE_ICONS.default; }
+function formatFileSize(b) {
+    if (b < 1024) return b+' B';
+    if (b < 1048576) return (b/1024).toFixed(1)+' KB';
+    return (b/1048576).toFixed(1)+' MB';
+}
+function formatUploadDate(s) {
+    return new Date(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+
+function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const cats = ['Work','Reference','Personal','Reports','Designs','Other'];
+    const cat  = prompt('Category: Work, Reference, Personal, Reports, Designs','Work') || 'Other';
+    const finalCat = cats.includes(cat.trim()) ? cat.trim() : 'Other';
+    filesData.push({ id:Date.now(), name:file.name, category:finalCat, size:file.size,
+        uploaded:new Date().toISOString(), mime:file.type||'application/octet-stream',
+        url:URL.createObjectURL(file) });
+    renderFiles();
+    showEmpNotification('"'+file.name+'" uploaded','success');
+    event.target.value = '';
+}
+
+function setFileCategory(cat, btn) {
+    currentFileCategory = cat;
+    document.querySelectorAll('.files-cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedFileId = null;
+    document.getElementById('fileDetailPanel').style.display = 'none';
+    renderFiles();
+}
+
+function renderFiles() {
+    const search   = (document.getElementById('filesSearchInput')?.value||'').toLowerCase();
+    let filtered   = filesData;
+    if (currentFileCategory !== 'All') filtered = filtered.filter(f => f.category === currentFileCategory);
+    if (search) filtered = filtered.filter(f => f.name.toLowerCase().includes(search));
+
+    const total     = filesData.length;
+    const totalSize = filesData.reduce((s,f) => s+f.size, 0);
+    document.getElementById('filesStoredCount').textContent  = total+' file'+(total!==1?'s':'')+' stored';
+    document.getElementById('filesTotalSize').textContent    = formatFileSize(totalSize);
+    document.getElementById('filesShowingCount').textContent = filtered.length;
+    document.getElementById('filesTotalCount').textContent   = total;
+
+    const listEl = document.getElementById('filesList');
+    if (!listEl) return;
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = '<div class="files-empty"><div class="files-empty-title">No files found</div><div class="files-empty-sub">Upload your first file to get started</div><button class="files-empty-upload" onclick="document.getElementById(\'fileUploadInput\').click()">Upload file</button></div>';
+        return;
+    }
+    listEl.innerHTML = filtered.map(f => {
+        const info = getFileIcon(f.name);
+        return '<div class="file-row'+(f.id===selectedFileId?' selected':'')+'" onclick="selectFile('+f.id+')">'
+            +'<div class="file-row-name"><div class="file-icon" style="background:'+info.bg+'">'+info.icon+'</div>'
+            +'<div class="file-name-text">'+f.name+'</div></div>'
+            +'<div><span class="file-cat-badge file-cat-'+f.category+'">'+f.category+'</span></div>'
+            +'<div style="font-size:13px;color:var(--text-muted);">'+formatFileSize(f.size)+'</div>'
+            +'<div style="font-size:13px;color:var(--text-muted);">'+formatUploadDate(f.uploaded)+'</div></div>';
+    }).join('');
+}
+
+function selectFile(id) {
+    selectedFileId = id;
+    const f = filesData.find(f => f.id === id);
+    if (!f) return;
+    const panel = document.getElementById('fileDetailPanel');
+    panel.style.display = 'flex';
+    const info = getFileIcon(f.name);
+    document.getElementById('fileDetailIcon').style.background = info.bg;
+    document.getElementById('fileDetailIcon').textContent      = info.icon;
+    document.getElementById('fileDetailName').textContent      = f.name;
+    document.getElementById('fileDetailMime').textContent      = f.mime;
+    document.getElementById('fileDetailSize').textContent      = formatFileSize(f.size);
+    document.getElementById('fileDetailUploaded').textContent  = formatUploadDate(f.uploaded);
+    document.getElementById('fileDetailCategory').innerHTML    = '<span class="file-cat-badge file-cat-'+f.category+'">'+f.category+'</span>';
+    document.getElementById('fileDetailDownload').onclick = () => { const a=document.createElement('a');a.href=f.url;a.download=f.name;a.click(); };
+    document.getElementById('fileDetailRemove').onclick   = () => {
+        if (!confirm('Remove "'+f.name+'"?')) return;
+        filesData = filesData.filter(fl => fl.id !== id);
+        selectedFileId = null; panel.style.display = 'none';
+        renderFiles(); showEmpNotification('File removed','success');
+    };
+    renderFiles();
+}
+
+function closeFileDetail() {
+    selectedFileId = null;
+    document.getElementById('fileDetailPanel').style.display = 'none';
+    renderFiles();
 }

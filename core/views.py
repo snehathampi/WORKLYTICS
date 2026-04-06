@@ -1242,3 +1242,89 @@ def get_my_workload(request):
         })
     except Employee.DoesNotExist:
         return JsonResponse({'error': 'Employee not found'}, status=404)
+
+# ==================== PROFILE APIs ====================
+
+@api_login_required
+def manager_profile_get(request):
+    """Get manager profile data (experience)"""
+    if request.user.requested_role != 'manager':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    try:
+        manager = Manager.objects.get(user=request.user)
+        return JsonResponse({
+            'success': True,
+            'experience': manager.experience_years,
+        })
+    except Manager.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Manager not found'}, status=404)
+
+
+@csrf_exempt
+@api_login_required
+def manager_profile_save(request):
+    """Save manager profile data (experience)"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    if request.user.requested_role != 'manager':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    try:
+        manager = Manager.objects.get(user=request.user)
+        body = json.loads(request.body)
+        experience = body.get('experience')
+        if experience is not None and str(experience).strip() != '':
+            manager.experience_years = int(experience)
+            manager.save()
+        return JsonResponse({'success': True})
+    except Manager.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Manager not found'}, status=404)
+    except (ValueError, TypeError) as e:
+        return JsonResponse({'success': False, 'error': 'Invalid experience value'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@api_login_required
+def employee_profile_get(request):
+    """Get employee profile data (experience + skills)"""
+    if request.user.requested_role != 'employee':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    try:
+        employee = Employee.objects.get(user=request.user)
+        return JsonResponse({
+            'success': True,
+            'experience': employee.experience_years,
+            'skills': employee.skills or '',
+        })
+    except Employee.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Employee not found'}, status=404)
+
+
+@csrf_exempt
+@api_login_required
+def employee_profile_save(request):
+    """Save employee profile data (experience + skills)"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    if request.user.requested_role != 'employee':
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    try:
+        employee = Employee.objects.get(user=request.user)
+        body = json.loads(request.body)
+
+        experience = body.get('experience')
+        if experience is not None and str(experience).strip() != '':
+            employee.experience_years = int(experience)
+
+        skills = body.get('skills')
+        if skills is not None:
+            employee.skills = skills.strip()
+
+        employee.save()
+        return JsonResponse({'success': True})
+    except Employee.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Employee not found'}, status=404)
+    except (ValueError, TypeError) as e:
+        return JsonResponse({'success': False, 'error': 'Invalid data'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

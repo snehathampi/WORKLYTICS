@@ -47,7 +47,7 @@
           </div>
         </div>
         <div class="profile-section-label">Profile Details</div>
-        <div class="profile-item">
+        <div class="profile-item" onclick="showPage('profile'); document.getElementById('profileDropdown').classList.remove('open');" style="cursor:pointer;">
           <div class="profile-item-icon">
             <svg width="13" height="13" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </div>
@@ -539,6 +539,115 @@
       </div>
     </div>
 
+    <!-- ══════════ PROFILE PAGE ══════════ -->
+    <div class="page" id="page-profile">
+      <div style="padding:28px 32px;max-width:860px;">
+
+        <!-- Breadcrumb -->
+        <div style="font-size:13px;color:#6b7280;margin-bottom:20px;">
+          <span style="cursor:pointer;color:#6366f1;" onclick="showPage('home')">Home</span>
+          <span style="margin:0 6px;">›</span>
+          <span>My Profile</span>
+        </div>
+
+        <!-- Profile Banner -->
+        <div style="background:linear-gradient(135deg,#1e2235 0%,#2d3561 100%);border-radius:14px;overflow:hidden;margin-bottom:24px;">
+          <div style="height:90px;background:linear-gradient(90deg,#1a1f3a,#2e3a6e);"></div>
+          <div style="padding:0 28px 22px;display:flex;align-items:center;gap:18px;margin-top:-28px;">
+            <div style="width:60px;height:60px;border-radius:50%;background:#ef4444;color:#fff;font-size:20px;font-weight:700;display:grid;place-items:center;border:3px solid #1e2235;flex-shrink:0;">{{ manager_initials|default:"US" }}</div>
+            <div>
+              <div style="color:#fff;font-size:17px;font-weight:700;">{{ manager_name|default:"Manager" }}</div>
+              <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+                <span style="background:#6366f1;color:#fff;font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;display:flex;align-items:center;gap:4px;">
+                  <svg width="10" height="10" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+                  Manager
+                </span>
+                <span style="color:#a0aec0;font-size:13px;">{{ manager_department|default:"Engineering" }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cards Row -->
+        <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:20px;align-items:start;">
+
+          <!-- Account Info Card -->
+          <div class="card" style="padding:24px;">
+            <div style="font-size:11px;color:#9ca3af;letter-spacing:1.2px;text-transform:uppercase;font-weight:600;margin-bottom:18px;">Account Info</div>
+            <div style="display:flex;flex-direction:column;gap:16px;">
+              <div style="display:flex;align-items:flex-start;gap:12px;">
+                <div style="width:34px;height:34px;border-radius:8px;background:#f3f4f6;display:grid;place-items:center;flex-shrink:0;">
+                  <svg width="15" height="15" fill="none" stroke="#6b7280" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#9ca3af;">Full Name</div>
+                  <div style="font-size:14px;color:#1f2a44;font-weight:500;">{{ manager_name|default:"Manager" }}</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px;">
+                <div style="width:34px;height:34px;border-radius:8px;background:#f3f4f6;display:grid;place-items:center;flex-shrink:0;">
+                  <svg width="15" height="15" fill="none" stroke="#6b7280" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#9ca3af;">Email</div>
+                  <div style="font-size:14px;color:#1f2a44;font-weight:500;word-break:break-all;">{{ manager_email|default:"manager@worklytics.com" }}</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px;">
+                <div style="width:34px;height:34px;border-radius:8px;background:#f3f4f6;display:grid;place-items:center;flex-shrink:0;">
+                  <svg width="15" height="15" fill="none" stroke="#6b7280" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#9ca3af;">Department</div>
+                  <div style="font-size:14px;color:#1f2a44;font-weight:500;">{{ manager_department|default:"Engineering" }}</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px;">
+                <div style="width:34px;height:34px;border-radius:8px;background:#f3f4f6;display:grid;place-items:center;flex-shrink:0;">
+                  <svg width="15" height="15" fill="none" stroke="#6b7280" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#9ca3af;">Role</div>
+                  <div style="font-size:14px;color:#1f2a44;font-weight:500;">Manager</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Professional Details Card -->
+          <div class="card" style="padding:24px;">
+            <div style="font-size:11px;color:#9ca3af;letter-spacing:1.2px;text-transform:uppercase;font-weight:600;margin-bottom:20px;">Professional Details</div>
+
+            <!-- Years of Experience -->
+            <div style="margin-bottom:24px;">
+              <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;">
+                <svg width="15" height="15" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                <span style="font-size:14px;font-weight:600;color:#1f2a44;">Years of Experience</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <input type="number" id="mgr-experience-input" min="0" max="50" placeholder="e.g. 5"
+                  value="{{ manager_experience|default:'' }}"
+                  style="width:120px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;color:#1f2a44;outline:none;">
+                <span style="font-size:13px;color:#6b7280;">yrs</span>
+              </div>
+              <div style="font-size:12px;color:#9ca3af;margin-top:6px;">Enter the total number of years of professional experience.</div>
+            </div>
+
+            <div style="border-top:1px solid #f3f4f6;margin-bottom:20px;"></div>
+
+            <!-- Save Button -->
+            <div style="display:flex;justify-content:flex-end;">
+              <button onclick="saveManagerProfile()" style="display:flex;align-items:center;gap:7px;padding:10px 22px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+                <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save Changes
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div><!-- /#page-profile -->
+
   </div><!-- /.main -->
 </div><!-- /.app-body -->
 
@@ -632,6 +741,7 @@
     </form>
   </div>
 </div>
+
 
 <script src="{% static 'js/manager.js' %}"></script>
 <script src="{% static 'js/simulation.js' %}"></script>

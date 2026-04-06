@@ -57,7 +57,7 @@
           <div class="profile-avatar-lg">{{ employee_initials|default:"ER" }}</div>
         </div>
         <div class="profile-section-label">Profile Details</div>
-        <div class="profile-item">
+        <div class="profile-item" onclick="showPage('profile'); document.getElementById('profileDropdown').classList.remove('open');" style="cursor:pointer;">
           <div class="profile-item-icon">
             <svg width="13" height="13" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
@@ -254,12 +254,14 @@
           </div>
           <div class="tasks-title-block"><h2>My tasks</h2></div>
         </div>
+
+        <!-- CHANGED: Removed Board tab, made List/Calendar/Files functional -->
         <div class="tab-bar">
-          <div class="tab active">List</div>
-          <div class="tab">Board</div>
-          <div class="tab">Calendar</div>
-          <div class="tab">Files</div>
+          <div class="tab active" id="tab-list" onclick="switchTaskTab('list')">List</div>
+          <div class="tab" id="tab-calendar" onclick="switchTaskTab('calendar')">Calendar</div>
+          <div class="tab" id="tab-files" onclick="switchTaskTab('files')">Files</div>
         </div>
+
         <div class="tasks-actions">
           <button class="btn-outline">
             <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -276,9 +278,123 @@
           </button>
         </div>
       </div>
-      <div class="tasks-body" id="tasksBody">
-        <!-- Tasks will be loaded by JavaScript -->
+
+      <!-- LIST SUB-VIEW -->
+      <div id="tasksBody" class="tasks-body">
+        <!-- Tasks loaded by JS -->
       </div>
+
+      <!-- CALENDAR SUB-VIEW -->
+      <div id="subview-calendar" class="tasks-subview" style="display:none;">
+        <div class="cal-layout">
+          <div class="cal-main">
+            <div class="cal-nav">
+              <button class="cal-today-btn" onclick="calGoToday()">Today</button>
+              <button class="cal-nav-btn" onclick="calPrevMonth()">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <button class="cal-nav-btn" onclick="calNextMonth()">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+              <span class="cal-month-label" id="calMonthLabel"></span>
+              <button class="cal-new-event-btn" onclick="openEventModal()">+ New event</button>
+            </div>
+            <div class="cal-grid-header">
+              <span>SUN</span><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+          </div>
+          <div class="cal-side">
+            <div class="cal-side-day" id="calSideDay"></div>
+            <div class="cal-side-month-label" id="calSideMonthLabel"></div>
+            <div class="cal-side-events-label">
+              <span id="calSideEventCount">0 EVENTS</span>
+              <button class="cal-add-link" onclick="openEventModal()">+ Add</button>
+            </div>
+            <div id="calSideEvents" class="cal-side-events-list"></div>
+            <div class="cal-legend">
+              <div class="cal-legend-label">LEGEND</div>
+              <div class="cal-legend-item"><span class="cal-legend-dot task-dot"></span> Tasks (from task list)</div>
+              <div class="cal-legend-item"><span class="cal-legend-dot reminder-dot"></span> Reminders</div>
+              <div class="cal-legend-item"><span class="cal-legend-dot event-dot"></span> Events</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FILES SUB-VIEW -->
+      <div id="subview-files" class="tasks-subview" style="display:none;">
+        <div class="files-toolbar">
+          <div class="files-search-wrap">
+            <svg width="13" height="13" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" id="filesSearchInput" placeholder="Search files..." oninput="renderFiles()" class="files-search-input">
+          </div>
+          <div class="files-cat-tabs">
+            <button class="files-cat-btn active" onclick="setFileCategory('All',this)">All</button>
+            <button class="files-cat-btn" onclick="setFileCategory('Work',this)">Work</button>
+            <button class="files-cat-btn" onclick="setFileCategory('Reference',this)">Reference</button>
+            <button class="files-cat-btn" onclick="setFileCategory('Personal',this)">Personal</button>
+            <button class="files-cat-btn" onclick="setFileCategory('Reports',this)">Reports</button>
+            <button class="files-cat-btn" onclick="setFileCategory('Designs',this)">Designs</button>
+          </div>
+          <button class="files-upload-btn" onclick="document.getElementById('fileUploadInput').click()">
+            <svg width="13" height="13" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload file
+          </button>
+          <input type="file" id="fileUploadInput" style="display:none;" onchange="handleFileUpload(event)">
+        </div>
+        <div class="files-meta-bar">
+          <span id="filesStoredCount">0 files stored</span>
+          <span class="files-meta-sep">|</span>
+          <span>Total: <span id="filesTotalSize">0 KB</span></span>
+          <span class="files-meta-sep">|</span>
+          <span>Showing <span id="filesShowingCount">0</span> of <span id="filesTotalCount">0</span></span>
+        </div>
+        <div class="files-layout">
+          <div class="files-list-wrap" id="filesListWrap">
+            <div class="files-list-head">
+              <span>Name</span><span>Category</span><span>Size</span><span>Uploaded</span>
+            </div>
+            <div id="filesList"></div>
+          </div>
+          <div class="file-detail-panel" id="fileDetailPanel" style="display:none;">
+            <div class="file-detail-header">
+              <span>File details</span>
+              <button onclick="closeFileDetail()" class="file-detail-close">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="file-detail-icon-wrap">
+              <div class="file-detail-icon" id="fileDetailIcon"></div>
+            </div>
+            <div class="file-detail-name" id="fileDetailName"></div>
+            <div class="file-detail-mime" id="fileDetailMime"></div>
+            <div class="file-detail-meta">
+              <div class="file-detail-row">
+                <span class="file-detail-key">Size</span>
+                <span class="file-detail-val" id="fileDetailSize"></span>
+              </div>
+              <div class="file-detail-row">
+                <span class="file-detail-key">Uploaded</span>
+                <span class="file-detail-val" id="fileDetailUploaded"></span>
+              </div>
+              <div class="file-detail-row">
+                <span class="file-detail-key">Category</span>
+                <span class="file-detail-val" id="fileDetailCategory"></span>
+              </div>
+            </div>
+            <button class="file-detail-download" id="fileDetailDownload">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download
+            </button>
+            <button class="file-detail-remove" id="fileDetailRemove">
+              <svg width="13" height="13" fill="none" stroke="#ef4444" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+              Remove file
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /#page-tasks -->
 
     <!-- ══ MY WORKLOAD PAGE ══ -->
@@ -349,7 +465,7 @@
           <div class="progress-bar" style="height:10px;margin-bottom:14px;">
             <div class="progress-fill" id="capacityProgress" style="width:0%;"></div>
           </div>
-          <div class="warning-box" id="warningBox" style="display: none;">
+          <div class="warning-box" id="warningBox" style="display:none;">
             <svg width="16" height="16" fill="none" stroke="#ef4444" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px;">
               <circle cx="12" cy="12" r="10"/>
               <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -366,8 +482,174 @@
       </div>
     </div><!-- /#page-workload -->
 
+    <!-- ══ PROFILE PAGE ══ -->
+    <div class="page" id="page-profile">
+      <div style="padding:28px 32px;max-width:860px;">
+
+        <div style="font-size:13px;color:#6b7280;margin-bottom:20px;">
+          <span style="cursor:pointer;color:#6366f1;" onclick="showPage('home')">Home</span>
+          <span style="margin:0 6px;">›</span>
+          <span>My Profile</span>
+        </div>
+
+        <div style="background:linear-gradient(135deg,#1e2235 0%,#2d3561 100%);border-radius:14px;overflow:hidden;margin-bottom:24px;">
+          <div style="height:90px;background:linear-gradient(90deg,#1a1f3a,#2e3a6e);"></div>
+          <div style="padding:0 28px 22px;display:flex;align-items:center;gap:18px;margin-top:-28px;">
+            <div style="width:60px;height:60px;border-radius:50%;background:#ef4444;color:#fff;font-size:20px;font-weight:700;display:grid;place-items:center;border:3px solid #1e2235;flex-shrink:0;">{{ employee_initials|default:"ER" }}</div>
+            <div>
+              <div style="color:#fff;font-size:17px;font-weight:700;">{{ employee_name|default:"Employee" }}</div>
+              <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+                <span style="background:#06b6d4;color:#fff;font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;display:flex;align-items:center;gap:4px;">
+                  <svg width="10" height="10" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+                  Employee
+                </span>
+                <span style="color:#a0aec0;font-size:13px;">{{ employee_department|default:"Engineering" }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:20px;align-items:start;">
+
+          <div class="card" style="padding:24px;">
+            <div style="font-size:11px;color:#9ca3af;letter-spacing:1.2px;text-transform:uppercase;font-weight:600;margin-bottom:18px;">Account Info</div>
+            <div style="display:flex;flex-direction:column;gap:16px;">
+              <div style="display:flex;align-items:flex-start;gap:12px;">
+                <div style="width:34px;height:34px;border-radius:8px;background:#f3f4f6;display:grid;place-items:center;flex-shrink:0;">
+                  <svg width="15" height="15" fill="none" stroke="#6b7280" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#9ca3af;">Full Name</div>
+                  <div style="font-size:14px;color:#1f2a44;font-weight:500;">{{ employee_name|default:"Employee" }}</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px;">
+                <div style="width:34px;height:34px;border-radius:8px;background:#f3f4f6;display:grid;place-items:center;flex-shrink:0;">
+                  <svg width="15" height="15" fill="none" stroke="#6b7280" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#9ca3af;">Email</div>
+                  <div style="font-size:14px;color:#1f2a44;font-weight:500;word-break:break-all;">{{ employee_email|default:"employee@worklytics.com" }}</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px;">
+                <div style="width:34px;height:34px;border-radius:8px;background:#f3f4f6;display:grid;place-items:center;flex-shrink:0;">
+                  <svg width="15" height="15" fill="none" stroke="#6b7280" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#9ca3af;">Department</div>
+                  <div style="font-size:14px;color:#1f2a44;font-weight:500;">{{ employee_department|default:"Engineering" }}</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px;">
+                <div style="width:34px;height:34px;border-radius:8px;background:#f3f4f6;display:grid;place-items:center;flex-shrink:0;">
+                  <svg width="15" height="15" fill="none" stroke="#6b7280" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#9ca3af;">Role</div>
+                  <div style="font-size:14px;color:#1f2a44;font-weight:500;">Employee</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="padding:24px;">
+            <div style="font-size:11px;color:#9ca3af;letter-spacing:1.2px;text-transform:uppercase;font-weight:600;margin-bottom:20px;">Professional Details</div>
+            <div style="margin-bottom:22px;">
+              <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;">
+                <svg width="15" height="15" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                <span style="font-size:14px;font-weight:600;color:#1f2a44;">Years of Experience</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <input type="number" id="emp-experience-input" min="0" max="50" placeholder="e.g. 5"
+                  value="{{ employee_experience|default:'' }}"
+                  style="width:120px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;color:#1f2a44;outline:none;">
+                <span style="font-size:13px;color:#6b7280;">yrs</span>
+              </div>
+              <div style="font-size:12px;color:#9ca3af;margin-top:6px;">Enter the total number of years of professional experience.</div>
+            </div>
+
+            <div style="border-top:1px solid #f3f4f6;margin-bottom:20px;"></div>
+
+            <div style="margin-bottom:22px;">
+              <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;">
+                <svg width="15" height="15" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                <span style="font-size:14px;font-weight:600;color:#1f2a44;">Skills</span>
+              </div>
+              <div id="emp-skills-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;min-height:28px;"></div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <input type="text" id="emp-skill-input" placeholder="Type a skill and press Enter or comma"
+                  style="flex:1;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;color:#1f2a44;outline:none;"
+                  onkeydown="empSkillInputKeydown(event)">
+                <button onclick="empAddSkillFromInput()" style="padding:8px 14px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                  Add
+                </button>
+              </div>
+              <div style="font-size:12px;color:#9ca3af;margin-top:6px;">Add one or more skills. Press Enter or , after each.</div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;">
+              <button onclick="saveEmployeeProfile()" style="display:flex;align-items:center;gap:7px;padding:10px 22px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
+                <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save Changes
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div><!-- /#page-profile -->
+
   </div><!-- /.main -->
 </div><!-- /.app-body -->
+
+<!-- ══ ADD TO CALENDAR MODAL ══ -->
+<div class="modal-overlay" id="eventModalOverlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-icon-wrap">
+        <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </div>
+      <span>Add to Calendar</span>
+      <button class="modal-close" onclick="closeEventModal()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label>Title *</label>
+        <input type="text" id="eventTitle" placeholder="e.g. Team standup, Review PR, Submit report..." class="modal-input">
+      </div>
+      <div class="modal-row2">
+        <div class="modal-field">
+          <label>Date</label>
+          <input type="date" id="eventDate" class="modal-input">
+        </div>
+        <div class="modal-field">
+          <label>Time (optional)</label>
+          <input type="time" id="eventTime" class="modal-input">
+        </div>
+      </div>
+      <div class="modal-field">
+        <label>Type</label>
+        <select id="eventType" class="modal-input modal-select">
+          <option value="reminder">🟡 Reminder</option>
+          <option value="event">🟢 Event</option>
+          <option value="task">🟣 Task</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label>Notes (optional)</label>
+        <textarea id="eventNotes" placeholder="Add any notes..." class="modal-input modal-textarea"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-cancel" onclick="closeEventModal()">Cancel</button>
+      <button class="modal-save" onclick="saveEvent()">Save event</button>
+    </div>
+  </div>
+</div>
 
 <script src="{% static 'js/appEMP.js' %}"></script>
 </body>

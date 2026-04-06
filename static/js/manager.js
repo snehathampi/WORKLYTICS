@@ -131,6 +131,7 @@ function showPage(page) {
     if (page === 'workload') renderEmployeeDetails();
     if (page === 'simulation') renderSimTable();
     if (page === 'performance') initPerfCharts();
+    if (page === 'profile') loadManagerProfileData();
 }
 
 function toggleSidebar() {
@@ -670,11 +671,18 @@ function openAddTaskModal(projectId) {
     const assigneeSelect = document.getElementById('newTaskAssignee');
     const dropdownSource = allEmployees.length > 0 ? allEmployees : employees;
     if (assigneeSelect && dropdownSource.length > 0) {
-        assigneeSelect.innerHTML = '<option value="">-- Unassigned --</option>' + 
-            dropdownSource.map(e => {
+        const getHours = (e) => {
+            const wl = employeeWorkload.find(w => w.name === e.name);
+            return wl ? wl.hours : 0;
+        };
+        const sorted = [...dropdownSource].sort((a, b) => getHours(a) - getHours(b));
+        assigneeSelect.innerHTML = '<option value="">-- Unassigned --</option>' +
+            sorted.map(e => {
                 const id = e.user_id !== undefined ? e.user_id : e.id;
-                const skills = e.skills || 'No skills';
-                return `<option value="${id}">${e.name} (${skills})</option>`;
+                const hours = getHours(e);
+                const disabled = hours >= 160 ? 'disabled' : '';
+                const color = hours >= 120 ? '#ef4444' : hours >= 60 ? '#22c55e' : '#f59e0b';
+                return `<option value="${id}" ${disabled} style="color:${color}">${e.name} (${hours}h)</option>`;
             }).join('');
     }
     
@@ -1218,6 +1226,48 @@ function initPerfCharts(data) {
             }
         });
     }
+}
+
+// ── PROFILE PAGE ─────────────────────────────────────
+function loadManagerProfileData() {
+    fetch('/core/api/manager/profile/', {
+        credentials: 'include',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        const expInput = document.getElementById('mgr-experience-input');
+        if (expInput && data.experience !== undefined && data.experience !== null) {
+            expInput.value = data.experience;
+        }
+    })
+    .catch(() => {
+        // silently fail — the Django template already pre-fills the value
+    });
+}
+
+function saveManagerProfile() {
+    const experience = document.getElementById('mgr-experience-input')?.value;
+
+    fetch('/core/api/manager/profile/save/', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ experience })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Profile saved successfully', 'success');
+        } else {
+            showNotification('Error: ' + (data.error || 'Could not save'), 'error');
+        }
+    })
+    .catch(() => showNotification('Failed to save profile', 'error'));
 }
 
 // ── MODALS ────────────────────────────────────────────
